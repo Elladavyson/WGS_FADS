@@ -1,0 +1,24 @@
+### Using the UKB RAP 
+Locally
+Download the DNAnexus toolkit 
+Launch a Cloud Workstation 
+Inspect it on the UKB-RAP interface (to get Job ID)
+
+# DNA Nexus commands 
+dx login 
+# Need to set up the SSH-config BEFORE you launch the cloud workstation or it will reject the ssh key
+dx ssh job-ID
+
+# Cloud Computing UKB links 
+https://www.youtube.com/watch?v=9I78As5uRfw - youtube video about cloud computing at UKB RAP 
+
+# Downloading BCFTOOLS
+git clone --recurse-submodules https://github.com/samtools/htslib.git
+git clone https://github.com/samtools/bcftools.git
+cd bcftools
+make
+
+# Add to the PATH variable 
+export PATH="$PATH:~/bcftools"
+
+
