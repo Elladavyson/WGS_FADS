@@ -7,11 +7,24 @@
 # DNA Nexus
 # Run the login command first 
 dx login 
+# Launch the workstation from command line 
+dx run app-cloud_workstation --ssh
 # Log in to the launched CloudStation (Job ID)
 dx ssh job-ID
 
 # Cloud Computing UKB links 
 # https://www.youtube.com/watch?v=9I78As5uRfw - youtube video about cloud computing at UKB RAP 
+# https://documentation.dnanexus.com/developer/cloud-workstation
+
+# Setting up the workstation 
+unset DX_WORKSPACE_ID # Unsets an environment variable set up when the cloudstation is launched
+dx cd $DX_PROJECT_CONTEXT_ID: # Change the workstations working directory to that of the parent project 
+
+# View and select working project
+dx select --level=VIEW
+# Downloading data to the workstation 
+# If you've set the project using the dx select above then you don't need the project: 
+dx download project-WGS_AVT:/Bulk/DRAGEN\ WGS/DRAGEN\ population\ level\ WGS\ variants,\ pVCF\ format\ [500k\ release]/chr11/ukb24310_c11_b3080_v1.vcf.gz*
 
 # Downloading BCFTOOLS
 git clone --recurse-submodules https://github.com/samtools/htslib.git
@@ -22,4 +35,12 @@ make
 # Add to the PATH variable 
 export PATH="$PATH:~/bcftools"
 
+# Save the entire workspace on the worker as a snapshot
+dx-create-snapshot
 
+# BCFTools look at the top position of the file 
+bcftools view -H ukb24310_c11_b3080_v1.vcf.gz | view 
+
+
+# Variant annotation links 
+# https://www.youtube.com/watch?v=mK_204Zvkbs
