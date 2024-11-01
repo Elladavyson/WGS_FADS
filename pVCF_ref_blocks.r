@@ -3,6 +3,7 @@
 library(dplyr)
 library(data.table)
 library(biomaRt)
+library(stringr)
 
 # From https://biobank.ndph.ox.ac.uk/ukb/refer.cgi?id=2009
 # wget on EDDIE and copied to scratch 
