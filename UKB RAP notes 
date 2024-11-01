@@ -44,3 +44,7 @@ bcftools view -H ukb24310_c11_b3080_v1.vcf.gz | view
 
 # Variant annotation links 
 # https://www.youtube.com/watch?v=mK_204Zvkbs
+
+# Uploading any files back to work project
+
+dx upload --path "$DX_PROJECT_CONTEXT_ID:" file 
