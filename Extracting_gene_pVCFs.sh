@@ -1,4 +1,4 @@
-input_file="FADS_cluster_UKB_pVCF.tsv"
+input_file="test_cluster_UKB_pVCF.tsv"
 
 while IFS=$'\t' read -r hgnc_symbol chr start_position end_position strand ensembl_gene_id ensembl_transcript_id transcript_is_canonical covering_files; do
 
@@ -21,10 +21,8 @@ while IFS=$'\t' read -r hgnc_symbol chr start_position end_position strand ensem
   # Filter out the gene region present in the VCF file, normalise and index
         bcftools view -r "$region" "$vcf_file" -Ou |
         bcftools norm -f GRCh38_full_analysis_set_plus_decoy_hla.fa -m -any -Oz -o $output_file
-        tabix -p $output_file
+        bcftools index --tbi $output_file
         echo "Normalised, left-aligned and biallelic sites for $hgnc_symbol processed from $vcf_file and saved to $output_file"
-        dx upload --path "$DX_PROJECT_CONTEXT_ID:" $output_file
-        dx upload --path "$DX_PROJECT_CONTEXT_ID:" "$output_file.tbi"
   # Query the variants for Allele Frequency etc 
         bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/AC\t%INFO/AN\n' $output_file > $variant_output_file
         dx upload --path "$DX_PROJECT_CONTEXT_ID:" $variant_output_file
