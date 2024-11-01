@@ -15,8 +15,8 @@ while IFS=$'\t' read -r hgnc_symbol chr start_position end_position strand ensem
   # Get the base name for file tracking (i.e the field ID in UKB)
     base_name=$(basename "$vcf_file" .vcf.gz)
   # Define the output file names (one VCF and one TSV)
-    output_file="${basename}_norm_${hgnc_symbol}.vcf.gz"
-    variant_output_file="${basename}_${hgnc_symbol}_variants.tsv"
+    output_file="${base_name}_norm_${hgnc_symbol}.vcf.gz"
+    variant_output_file="${base_name}_${hgnc_symbol}_variants.tsv"
         echo "$vcf_file"
   # Filter out the gene region present in the VCF file, normalise and index
         bcftools view -r "$region" "$vcf_file" -Ou |
