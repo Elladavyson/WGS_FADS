@@ -65,10 +65,34 @@ gene_coverage <- gene_coverage %>%
   mutate(covering_files = sapply(covering_files, function(x) paste(x, collapse = ":")))
 
 # Get the numbers of the files 
-file_nums <- c(str_split(fads$covering_files, ":")) %>% unlist() %>% unique() %>% sub(".*b(\\d+).*", "\\1", .) %>% as.numeric() %>% sort()
+file_nums <- c(str_split(gene_positions$covering_files, ":")) %>% unlist() %>% unique() %>% sub(".*b(\\d+).*", "\\1", .) %>% as.numeric() %>% sort()
 
 write.table(gene_coverage, "Resources/FADS_cluster_UKB_pVCF.tsv", sep = "\t", row.names = F, quote = F)
-# The file ukb24310_c11_b3090_v1.vcf.gz has a starting position of 61799029
-# The file ukb24310_c11_b3091_v1.vcf.gz has a starting position of 61819030
 
-# File with information on FADS cluster is b3090_v1 and b3091_v1
+
+# Graph with information about genes and uKB files
+fads <- gene_positions
+pvcf_fads <- pvcf_ref %>% filter(filename %in% c(str_split(fads$covering_files, ":") %>% unlist() %>% unique()))
+
+# Merge
+
+pvcf_genes <- rbind(pvcf_fads %>% 
+rename(name = filename, chr = chromosome, start_position = starting_position, end_position = end) %>% 
+mutate(file = (str_split(name, ":") %>% sub(".*b(\\d+).*", "\\1", .)), 
+position = 1,  strand = "UKB file"),
+fads %>% rename(name = hgnc_symbol) %>% select(
+    name, chr, start_position, end_position, strand) %>%
+    mutate(file = name, position = c(2:7))
+)
+
+# Plot
+
+plot <- ggplot(pvcf_genes, aes(x = start_position, xend = end_position, y = position)) + 
+geom_dumbbell(size = 1, alpha = 0.7, aes(color = as.factor(strand))) + 
+scale_color_manual(values = c("UKB file" = "black", "-1" = "red", "1" = "blue"), name = "Strand")+
+geom_text(data = pvcf_genes, aes(label = file, x = start_position + ((end_position-start_position)/2), y = position+0.1), family = "Times New Roman") +
+theme_bw() + labs(x = "Chromosome 11 position", y ="Genes")
+
+# Save
+
+ggsave("FADS_genes_ukb_files.png", plot = plot, width=8, height = 6, device = "png", dpi = 300)
