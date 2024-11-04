@@ -33,7 +33,7 @@ while IFS=$'\t' read -r hgnc_symbol chr start_position end_position strand ensem
         echo "$vcf_file"
         echo "$norm_file"
   # Filter out the gene region present in the VCF file, normalise and index
-        bcftools view -r "$region" "$norm_file" -0z -o $output_file
+        bcftools view -r "$region" "$norm_file" -Oz -o $output_file
         bcftools index --tbi $output_file
         echo "Processed region $region for gene $hgnc_symbol processed from $norm_file and saved to $output_file"
   # Query the variants for Allele Frequency etc 
