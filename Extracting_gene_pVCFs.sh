@@ -1,4 +1,4 @@
-input_file="FADS_genes_remaining_UKB_pVCF.tsv"
+input_file="FADS_cluster_UKB_pVCF.tsv"
 
 # Normalise all the pVCF files 
 
