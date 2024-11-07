@@ -4,7 +4,7 @@ for vcf_file in *.vcf.gz; do
 echo "$vcf_file"
 base_name=$(basename "$vcf_file" .vcf.gz)
 norm_vcf="${base_name}_norm.vcf.gz"
-bcftools norm -f GRCh38_full_analysis_set_plus_decoy_hla.fa -m -any -Oz -o "$norm_vcf" "$vcf_file"
+bcftools norm -f GRCh38_full_analysis_set_plus_decoy_hla.fa -m -any -Oz -o "$norm_vcf" "$vcf_file" 2>> norm_errors_3091.log
 bcftools index --tbi "$norm_vcf"
 echo "Normalized $vcf_file -> $norm_vcf"
 echo "-----------------"

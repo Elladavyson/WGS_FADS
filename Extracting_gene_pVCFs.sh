@@ -1,5 +1,5 @@
-input_file="${1}_cluster_UKB_pVCF.tsv"
-
+input_file="${1}_UKB_pVCF.tsv"
+echo $input_file 
 while IFS=$'\t' read -r hgnc_symbol chr start_position end_position strand ensembl_gene_id ensembl_transcript_id transcript_is_canonical covering_files; do
 
     # Skip the header line if it's present
