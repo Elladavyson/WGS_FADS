@@ -30,3 +30,7 @@ bcftools +split-vep -f '%CHROM\t%POS\t%REF\t%ALT\t%CSQ\n' -d -A tab ukb24310_c11
 
 ## Open Cravat
 nano dxapp.json # Edit the regionalOptions argument to be "aws:eu-west-2"
+
+# Remove all samples from a VCF
+(bcftools query -l ukb24310_c11_b3089_v1_FEN1_norm.vcf.gz) > samples_rm.txt
+bcftools view -S ^samples_rm.txt -Oz -o output.vcf.gz ukb24310_c11_b3089_v1_FEN1_norm.vcf.gz

@@ -18,7 +18,7 @@ run_normalise="bash normalise_pVCF_files.sh"
 
 ### Extracting for each gene 
 
-run_extract="bash Extracting_gene_pVCFs.sh {genename}"
+run_extract="bash Extracting_gene_pVCFs.sh MYRF"
  dx run swiss-army-knife \
  -iin="/Output/ukb24310_c11_b3087_v1_norm.vcf.gz.tbi" \
  -iin="/Output/ukb24310_c11_b3087_v1_norm.vcf.gz" \
@@ -26,10 +26,10 @@ run_extract="bash Extracting_gene_pVCFs.sh {genename}"
  -iin="/Output/ukb24310_c11_b3088_v1_norm.vcf.gz" \
    -iin="/Output/ukb24310_c11_b3089_v1_norm.vcf.gz.tbi" \
  -iin="/Output/ukb24310_c11_b3089_v1_norm.vcf.gz" \
- -iin="{genename}_UKB_pVCF.tsv" \
+ -iin="MYRF_UKB_pVCF.tsv" \
  -iin="/Code/Extracting_gene_pVCFs.sh"  \
  -icmd="${run_extract}" \
- --tag="extract_{genename}_3087_3088_3089" \
+ --tag="extract_MYRF_3087_3088_3089" \
  --instance-type "mem1_hdd1_v2_x36" \
  --destination="/Output/" \
  --brief --yes
