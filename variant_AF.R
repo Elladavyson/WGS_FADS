@@ -1,40 +1,45 @@
 library(ggalt)
 library(stringr)
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
 
-# dx download *_variants.tsv
-# Concatenate all the _variants files together 
-system("cat *FADS1_variants.tsv > FADS1_variants.tsv")
-system("cat *FADS2_variants.tsv > FADS2_variants.tsv")
-system("cat *FADS3_variants.tsv > FADS3_variants.tsv")
-system("cat *MYRF_variants.tsv > MYRF_variants.tsv")
-system("cat *FEN1_variants.tsv > FEN1_variants.tsv")
-system("cat *TMEM258_variants.tsv > TMEM258_variants.tsv")
+# dx download the variants 
+# dx download /Output/gene_VCF_variants/variants/*
 
-# Read in the files information 
+# Read in the FADS coordinates used to index the VCF files 
+fads <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
+# Filter to the genes which we have available now (not FADS1 or FADS2 due to the 3090 file)
+fads <- fads %>% filter(hgnc_symbol %in% c("FADS1", "FADS2")==FALSE)
+# Read in the variants files
+for (i in c(1:nrow(fads))) {
+    gene <- fads$hgnc_symbol[i]
+    print(gene)
+    print(paste0("gene_co-ordinates: ", fads$start_position[i], "-", fads$end_position[i]))
+    gene_table <- read.table(paste0(gene, "_variants.tsv"), sep = "\t")
+    colnames(gene_table) <- c("CHR", "POS", "REF", "ALT", "FILTER", "AC", "AN")
+    gene_table <- gene_table %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT), 
+    AF = AC/AN)
+    print(paste0("First variant:", gene_table$chr_pos_ref_alt[1], "\n Last variant:", tail(gene_table$chr_pos_ref_alt,1)))
+    assign(paste0(gene, "_variants"), gene_table)
+    frequency_counts <- gene_table %>% mutate(
+    range = case_when(
+      AF < 0.000001 ~ "< 0.000001",
+      AF < 0.00001 ~ "< 0.00001",
+      AF < 0.0001 ~ "< 0.0001",
+      AF < 0.001 ~ "< 0.001",
+      AF < 0.01 ~ "< 0.01",
+      AF < 0.1 ~ "< 0.1",
+      AF < 0.5 ~ "< 0.5",
+      TRUE ~ ">= 0.5"
+    )
+  ) %>%
+  count(range)
+  gene_af_plot <- ggplot(frequency_counts, aes(x=range, y = n)) + 
+geom_bar(stat="identity", fill = "skyblue") +
+geom_text(aes(label = n), vjust = -0.5, color = "black", size = 2) + 
+labs(x = "UKB Allele Frequency Range", y = "Count", title=paste0(gene, ":", nrow(gene_table), " variants")) + theme_minimal()
+assign(paste0(gene, "_AF_plt"), gene_af_plot)
+}
 
-fads_files <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
-
-# Get the number of the variants in each file (sanity checking results and no truncations)
-# FADS1 - 3090 and 3091
-fads1_3090 <- read.table("ukb24310_c11_b3090_FADS1_variants.tsv", sep = "\t")
-fads1_3091 <- read.table("ukb24310_c11_b3090_FADS1_variants.tsv", sep = "\t")
-
-# FADS2 - 3092 and 3093
-fads2_3092 <- read.table("ukb24310_c11_b3092_FADS2_variants.tsv", sep = "\t")
-fads2_3093 <- read.table("ukb24310_c11_b3093_FADS2_variants.tsv", sep = "\t")
-
-# FADS3 3093 and 3094
-fads3_3093 <- read.table("ukb24310_c11_b3093_FADS3_variants.tsv", sep = "\t")
-fads3_3094 <- read.table("ukb24310_c11_b3094_FADS3_variants.tsv", sep = "\t")
-
-# FEN1 3089
-fen1_3089 <- read.table("ukb24310_c11_b3089_FEN1_variants.tsv", sep = "\t")
-
-# MYRF 3087, 3088, 3089
-myrf_3087 <- read.table("ukb24310_c11_b3087_MYRF_variants.tsv", sep = "\t")
-myrf_3088 <- read.table("ukb24310_c11_b3088_MYRF_variants.tsv", sep = "\t")
-myrf_3089 <- read.table("ukb24310_c11_b3089_MYRF_variants.tsv", sep = "\t")
-
-# TMEM258 3088 and 3089
-tmem_3088 <- read.table("ukb24310_c11_b3088_TMEM258_variants.tsv", sep = "\t")
-tmem_3089 <- read.table("ukb24310_c11_b3089_TMEM258_variants.tsv", sep = "\t")
+ggsave(filename = "AF_barplots.png", ggarrange(MYRF_AF_plt, FEN1_AF_plt, FADS3_AF_plt, TMEM258_AF_plt), width = 10, height = 8, device = "png", dpi = 300)
