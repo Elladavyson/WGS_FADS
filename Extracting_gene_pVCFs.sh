@@ -38,7 +38,7 @@ while IFS=$'\t' read -r hgnc_symbol chr start_position end_position strand ensem
 
   echo "Concatenated VCF for $hgnc_symbol saved as $concatenated_vcf"
   variant_output_file="${hgnc_symbol}_variants.tsv"
-  bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/AC\t%INFO/AN\n' $output_file > $variant_output_file
+  bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/AC\t%INFO/AN\n' $concatenated_vcf > $variant_output_file
   echo "Queried variants for gene $hgnc_symbol saved to $variant_output_file"
   echo "===================="
 
