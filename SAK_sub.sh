@@ -12,7 +12,7 @@ run_normalise="bash normalise_pVCF_files.sh"
  -iin="/Code/normalise_pVCF_files.sh" \
  -icmd="${run_normalise}" \
  --tag="normalise_3091" \
- --instance-type "mem1_hdd1_v2_x36" \
+ --instance-type "mem1_hdd1_v2_x72" \
  --destination="/Output/" \
  --brief --yes
 
@@ -33,6 +33,44 @@ run_extract="bash Extracting_gene_pVCFs.sh MYRF"
  --instance-type "mem1_hdd1_v2_x36" \
  --destination="/Output/" \
  --brief --yes
+
+
+run_extract="bash Extracting_gene_pVCFs.sh FADS1"
+ dx run swiss-army-knife \
+ -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3089_v1_norm.vcf.gz.tbi" \
+ -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3089_v1_norm.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3090_v1_norm.vcf.gz.tbi" \
+ -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3090_v1_norm.vcf.gz" \
+   -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3091_v1_norm.vcf.gz.tbi" \
+   -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3091_v1_norm.vcf.gz" \
+ -iin="/Input/FADS1_UKB_pVCF.tsv" \
+ -iin="/Code/Extracting_gene_pVCFs.sh"  \
+ -icmd="${run_extract}" \
+ --tag="extract_FADS1_3089_3090_3091" \
+ --instance-type "mem1_hdd1_v2_x36" \
+ --destination="/Output/" \
+ --brief --yes
+
+ run_extract="bash Extracting_gene_pVCFs.sh FADS2"
+ dx run swiss-army-knife \
+ -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3089_v1_norm.vcf.gz.tbi" \
+ -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3089_v1_norm.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3090_v1_norm.vcf.gz.tbi" \
+ -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3090_v1_norm.vcf.gz" \
+   -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3091_v1_norm.vcf.gz.tbi" \
+   -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3091_v1_norm.vcf.gz" \
+      -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3092_v1_norm.vcf.gz.tbi" \
+   -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3092_v1_norm.vcf.gz" \
+      -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3093_v1_norm.vcf.gz.tbi" \
+   -iin="/Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3093_v1_norm.vcf.gz" \
+ -iin="/Input/FADS2_UKB_pVCF.tsv" \
+ -iin="/Code/Extracting_gene_pVCFs.sh"  \
+ -icmd="${run_extract}" \
+ --tag="extract_FADS2_3089_3090_3091_3092_3093" \
+ --instance-type "mem1_hdd1_v2_x72" \
+ --destination="/Output/" \
+ --brief --yes
+
 
 
 run_extract="bash Extracting_gene_pVCFs.sh TMEM258"
@@ -71,6 +109,6 @@ run_extract="bash Extracting_gene_pVCFs.sh FEN1"
  -iin="/Code/Extracting_gene_pVCFs.sh"  \
  -icmd="${run_extract}" \
  --tag="extract_FADS3_3087_3088_3089" \
- --instance-type "mem1_hdd1_v2_x36" \
+ --instance-type "mem1_hdd1_v2_x72" \
  --destination="/Output/" \
  --brief --yes
