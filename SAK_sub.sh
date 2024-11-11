@@ -215,3 +215,18 @@ run_index="bcftools index --tbi FADS2_combined.vcf.gz"
  --brief --yes
 
  ## Running variant level and sample level QC
+
+ run_qc="bash qc_filters.sh FEN1"
+   dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FEN1_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FEN1_combined.vcf.gz.tbi" \
+  -iin="/Output/gene_VCF_variants/QualControl/FEN1_missing.imiss" \
+  -iin="/Input/ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenScot_v2.id" \
+  -iin="/Input/MajorDepression.ukb24262.2021-07.txt" \
+  -iin="/Code/qc_filters.sh" \
+  -iin="/Code/sample_filters.R" \
+ -icmd="${run_qc}" \
+ --tag="FEN1_QC" \
+ --instance-type "mem1_hdd1_v2_x36" \
+ --destination="/Output/" \
+ --brief --yes
