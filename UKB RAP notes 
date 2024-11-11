@@ -32,9 +32,20 @@ git clone https://github.com/samtools/bcftools.git
 cd bcftools
 make
 
+# Downloading VCFTOOLS
+# Does not work on the cloud as you need sudo to perform make install
+
+git clone https://github.com/vcftools/vcftools.git
+cd vcftools
+./autogen.sh
+./configure
+make
+make install
+
 # Add to the PATH variable 
 export PATH="$PATH:~/bcftools"
-
+export PATH="$PATH:~/vcftools"
+export BCFTOOLS_PLUGINS=~/bcftools/plugins
 # Save the entire workspace on the worker as a snapshot
 dx-create-snapshot
 
