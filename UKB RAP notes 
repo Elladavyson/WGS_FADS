@@ -34,6 +34,7 @@ make
 
 # Downloading VCFTOOLS
 # Does not work on the cloud as you need sudo to perform make install
+# All VCFtools demands submitted through SAK
 
 git clone https://github.com/vcftools/vcftools.git
 cd vcftools
