@@ -16,11 +16,11 @@ echo "Filtering to unrelated individuals with sample missingness < 0.1 and of eu
 Rscript sample_filters.R --gene ${gene}
 
 # Outputs a sample list called unrelated_nomiss_${gene}_idlist.id
-
-bcftools view -S unrelated_nomiss_${gene}_idlist.id -o ${gene}_varqc_combined.vcf.gz -Oz ${gene}_varqc_sampqc_comb.vcf.gz
+echo "Filter to unrelated id list"
+bcftools view -S unrelated_nomiss_mdd_${gene}_idlist.id ${gene}_varqc_combined.vcf.gz -Oz -o ${gene}_varqc_sampqc_comb.vcf.gz
 
 echo "Filtered and QC variants in ${gene}_varqc_sampqc_comb.vcf.gz"
-
+echo "Querying the variants"
 bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/AC\t%INFO/AN\n' ${gene}_varqc_sampqc_comb.vcf.gz > ${gene}_variants_qc.tsv
 
 echo "Filtered and QC variants extracted and saved in tabular format at ${gene}_variants_qc.tsv"
