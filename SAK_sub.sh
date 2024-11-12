@@ -132,12 +132,12 @@ run_extract="bash Extracting_gene_pVCFs.sh FEN1"
  --destination="/Output/" \
  --brief --yes
 
- run_concat="bcftools concat -o FADS1_combined.vcf.gz -O z  ukb24310_c11_b3090_v1_norm_FADS2.vcf.gz ukb24310_c11_b3091_v1_norm_FADS2.vcf.gz"
+ run_concat="bcftools concat -o FADS1_combined.vcf.gz -O z  ukb24310_c11_b3090_v1_norm_FADS1.vcf.gz ukb24310_c11_b3091_v1_norm_FADS1.vcf.gz"
  dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3090_v1_norm_FADS2.vcf.gz.tbi" \
- -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3090_v1_norm_FADS2.vcf.gz" \
-   -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3091_v1_norm_FADS2.vcf.gz.tbi" \
- -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3091_v1_norm_FADS2.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3090_v1_norm_FADS1.vcf.gz.tbi" \
+ -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3090_v1_norm_FADS1.vcf.gz" \
+   -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3091_v1_norm_FADS1.vcf.gz.tbi" \
+ -iin="/Output/gene_VCF_variants/gene_vcfs/ukb24310_c11_b3091_v1_norm_FADS1.vcf.gz" \
  -icmd="${run_concat}" \
  --tag="concat_FADS1_3090_3091" \
  --instance-type "mem1_hdd1_v2_x72" \
@@ -204,29 +204,94 @@ run_index="bcftools index --tbi FADS2_combined.vcf.gz"
  --destination="/Output/" \
  --brief --yes
 
-     run_sample_missingness="vcftools --gzvcf TMEM258_combined.vcf.gz --missing-indv --out TMEM258_missing"
+     run_sample_missingness="vcftools --gzvcf FADS1_combined.vcf.gz --missing-indv --out FADS1_missing"
   dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/TMEM258_combined.vcf.gz" \
-   -iin="/Output/gene_VCF_variants/gene_vcfs/TMEM258_combined.vcf.gz.tbi" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz" \
+   -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz.tbi" \
  -icmd="${run_sample_missingness}" \
- --tag="missingness_TMEM258" \
+ --tag="missingness_FADS1" \
  --instance-type "mem1_hdd1_v2_x8" \
- --destination="/Output/" \
+ --destination="/Output/gene_VCF_variants/QualControl/" \
  --brief --yes
 
  ## Running variant level and sample level QC
 
- run_qc="bash qc_filters.sh FEN1"
+ run_qc="bash qc_filters.sh FADS2"
    dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/FEN1_combined.vcf.gz" \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/FEN1_combined.vcf.gz.tbi" \
-  -iin="/Output/gene_VCF_variants/QualControl/FEN1_missing.imiss" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz.tbi" \
+  -iin="/Output/gene_VCF_variants/QualControl/FADS2_missing.imiss" \
   -iin="/Input/ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenScot_v2.id" \
   -iin="/Input/MajorDepression.ukb24262.2021-07.txt" \
   -iin="/Code/qc_filters.sh" \
   -iin="/Code/sample_filters.R" \
  -icmd="${run_qc}" \
- --tag="FEN1_QC" \
+ --tag="FADS2_QC" \
  --instance-type "mem1_hdd1_v2_x36" \
+ --destination="/Output/" \
+ --brief --yes
+
+ run_query="bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/AC\t%INFO/AN\n' FADS2_combined.vcf.gz > FADS2_variants.tsv"
+ dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz" \
+   -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz.tbi" \
+ -icmd="${run_query}" \
+ --tag="query_FADS2" \
+ --instance-type "mem1_hdd1_v2_x8" \
+ --destination="/Output/gene_VCF_variants/gene_vcfs/" \
+ --brief --yes
+
+# The QC script I began first did not use the correct id list file, so rederived them and then manually doing the sample QC step again
+
+  run_sampqc="bcftools view -S unrelated_nomiss_mdd_TMEM258_idlist.id TMEM258_varqc_combined.vcf.gz -Oz -o TMEM258_varqc_sampqc_comb.vcf.gz"
+ dx run swiss-army-knife \
+  -iin="/Output/TMEM258_varqc_combined.vcf.gz" \
+  -iin="/Output/unrelated_nomiss_mdd_TMEM258_idlist.id" \
+ -icmd="${run_sampqc}" \
+ --tag="sample_filter_TMEM258" \
+ --instance-type "mem1_hdd1_v2_x8" \
+ --destination="/Output/" \
+ --brief --yes
+
+# The QC script doesn't seem to be filtering on the HWE flag properly, so doing this for each gene too 
+
+  run_HWEfilter="bcftools filter -e 'INFO/HWE < 1e-100 || INFO/HWE == 0 || F_MISSING > 0.1' FEN1_varqc_sampqc_comb.vcf.gz -Oz -o FEN1_varqc_sampqc_HWE_combined.vcf.gz"
+ dx run swiss-army-knife \
+  -iin="/Output/FEN1_varqc_sampqc_comb.vcf.gz" \
+ -icmd="${run_HWEfilter}" \
+ --tag="HWE_filter_FEN1" \
+ --instance-type "mem1_hdd1_v2_x8" \
+ --destination="/Output/" \
+ --brief --yes
+
+# There is high missingness in the FADS1 gene from the VCFTools input- manually checking this missingness in the genotypes! 
+
+ query_genotypes="bcftools view -S sample_missingFADS1.id FADS1_combined.vcf.gz | bcftools query -f '[%CHROM\t%POS\t%REF\t%ALT\t%SAMPLE\t%GT\n]' > FADS1_nsample_oQC_missing_genotypes.tsv"
+    dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz.tbi" \
+  -iin="sample_missingFADS1.id" \
+ -icmd="${query_genotypes}" \
+ --tag="FADS1_geno_missingness_check" \
+ --instance-type "mem1_hdd1_v2_x36" \
+ --destination="/Output/" \
+ --brief --yes
+
+ extract_qc_metrics="bcftools query -f "%CHROM\t%POS\t%REF\t%ALT\t%INFO/F_MISSING\t%INFO/HWE\n" MYRF_combined_tag.vcf.gz > MYRF_all_qcmetrics.tsv"
+dx run swiss-army-knife \
+  -iin="/Output/MYRF_combined_tag.vcf.gz" \
+ -icmd="${extract_qc_metrics}" \
+ --tag="QC metrics" \
+ --instance-type "mem1_hdd1_v2_x8" \
+ --destination="/Output/" \
+ --brief --yes
+
+  strip_samples="bcftools view -S ^unrelated_nomiss_mdd_FEN1_idlist.id FEN1_varqc_sampqc_HWE_combined.vcf.gz -Oz -o FEN1_QC_nosamples.vcf.gz"
+dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FEN1_varqc_sampqc_HWE_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/QualControl/sample_list/unrelated_nomiss_mdd_FEN1_idlist.id" \
+ -icmd="${strip_samples}" \
+ --tag="FEN1 strip samples" \
+ --instance-type "mem1_hdd1_v2_x8" \
  --destination="/Output/" \
  --brief --yes
