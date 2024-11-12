@@ -1,5 +1,6 @@
 # dx download the variants 
-# dx download /Output/gene_VCF_variants/variants/*
+# dx download /Input/FADS_cluster_UKB_pVCF.tsv
+# dx download /Output/gene_VCF_variants/QualControl/*
 library(ggplot2)
 library(dplyr)
 # Read in the FADS coordinates used to index the VCF files 
