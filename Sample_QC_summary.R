@@ -1,6 +1,7 @@
 # dx download the variants 
 # dx download /Input/FADS_cluster_UKB_pVCF.tsv
-# dx download /Output/gene_VCF_variants/QualControl/*
+# dx download /Output/gene_VCF_variants/QualControl/sample_missingness/*
+# dx download /Output/gene_VCF_variants/QualControl/variant_QC/*
 library(ggplot2)
 library(dplyr)
 # Read in the FADS coordinates used to index the VCF files 
@@ -54,3 +55,44 @@ ggsave(filename = "sample_qc_summarybar.png", sample_qc_bar, width = 8, height =
 # dx upload missingness_hists.png
 # dx upload all_sample_qc.tsv
 # dx upload all_fads_sample_qc.tsv
+fads <- fads %>% filter(hgnc_symbol != "FADS2")
+
+for (i in c(1:nrow(fads))) {
+    gene <- fads$hgnc_symbol[i]
+    print(gene)
+    print(paste0("gene_co-ordinates: ", fads$start_position[i], "-", fads$end_position[i]))
+    variant_qc <- read.table(paste0(gene, "_all_qcmetrics.tsv"), sep = "\t", header =T)
+    colnames(variant_qc) <- c("CHR", "POS", "REF", "ALT", "F_MISSING", "HWE")
+    variant_qc_summary <- variant_qc %>%
+    summarize(
+        QC_passed =sum(F_MISSING <= 0.1 & HWE > 1E-100),
+        F_missing_gt_0.1 = sum(F_MISSING > 0.1),
+    HWE_lt_1e_100= sum(HWE < 1e-100),
+    both_HWE_F_MISSING = sum(HWE < 1e-100 & F_MISSING > 0.1)
+    ) %>%
+     mutate(GENE = gene) %>% 
+     select(GENE, everything())
+ assign(paste0(gene, "_qc_summary"), variant_qc_summary)
+
+}
+
+variant_qc_summary <- rbind(FADS1_qc_summary,FADS3_qc_summary, TMEM258_qc_summary, MYRF_qc_summary, FEN1_qc_summary)
+
+variant_qc_long <-  variant_qc_summary %>%
+    pivot_longer(cols = -GENE, 
+                 names_to = "Category", 
+                 values_to = "Count")
+
+variant_qc_bar <- ggplot(variant_qc_long, aes(x = GENE, y = Count, fill = Category)) + 
+geom_bar(stat="identity", position = "dodge") +  
+geom_text(aes(label = Count), position = position_dodge(width = 0.8), vjust = -0.7) + 
+theme_minimal() + 
+theme(legend.position = "top") +
+scale_fill_discrete(
+labels = c("QC_passed"="QC passed",
+"F_missing_gt_0.1" = "F MISSING > 0.1",
+"HWE_lt_1e_100" = "HWE < 1e-100",
+"both_HWE_F_MISSING" = "F_MISSING > 0.1 & HWE <1E-100"))
+
+ggsave(filename = "FADS_variant_qc_bar.png", variant_qc_bar , width = 10, height = 6, device = "png", dpi = 300)
+# dx upload FADS_variant_qc_bar.png
