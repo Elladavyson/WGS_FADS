@@ -9,7 +9,7 @@ bcftools +fill-tags ${gene}_combined.vcf.gz -Oz -o ${gene}_combined_tag.vcf.gz -
 # - HWE P value < 1e-100
 # - Missingness > 0.1
 echo "Filtering on the HWE < 1E-100 and F_MISSING > 0.1"
-bcftools filter -e 'INFO/HWE < 1e-100 || F_MISSING > 0.1' ${gene}_combined_tag.vcf.gz -Oz -o ${gene}_varqc_combined.vcf.gz 
+bcftools filter -e 'INFO/HWE < 1e-100 || INFO/HWE == 0 || F_MISSING > 0.1' ${gene}_combined_tag.vcf.gz -Oz -o ${gene}_varqc_combined.vcf.gz 
 
 # Filter to unrelated individuals of european ancestry and to samples < 0.1 missingness 
 echo "Filtering to unrelated individuals with sample missingness < 0.1 and of european ancestry"
