@@ -37,12 +37,14 @@ unrelated <- read.table("ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenSco
 unrelated <- merge(unrelated, missing, by.x = "V1", by.y = "INDV")
 print(paste0("Unrelated samples of european ancestry with WGS QC'd data for ", gene,": ", nrow(unrelated)))
 
+unrelated <- unrelated %>% filter(F_MISS <= 0.1)
+print(paste0("Unrelated samples of european ancestry and <= 0.1 missingness with WGS QC'd data for ", gene,": ", nrow(unrelated)))
 # Also filter to those with a MDD phenotype (PGC3)
 mdd <- read.table("MajorDepression.ukb24262.2021-07.txt", header =T)
 mdd <- mdd %>% filter(MajDepr != -9)
 unrelated_mdd <- merge(unrelated, mdd, by.x = "V1", by.y = "IID")
-print(paste0("Unrelated samples of european ancestry with WGS QC'd data for ", gene," and a MDD phenotype (PGC3)", nrow(unrelated)))
+print(paste0("Unrelated samples of european ancestry with WGS QC'd data for ", gene," and a MDD phenotype (PGC3)", nrow(unrelated_mdd)))
 
 # write out the unrelated IDs
 print(paste0("Writing out the sample list to unrelated_nomiss_mdd_", gene, "_idlist.id"))
-readr::write_lines(unrelated$V1, paste0("unrelated_nomiss_mdd_", gene, "_idlist.id"))
+readr::write_lines(unrelated_mdd$V1, paste0("unrelated_nomiss_mdd_", gene, "_idlist.id"))
