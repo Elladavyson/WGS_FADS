@@ -47,7 +47,8 @@ print(paste0("Unrelated samples of european ancestry with WGS QC'd data for ", g
 
 # Write out table of numbers as the sample QC 
 
-sample_QC <- data.table(label= c("Total N", "Unrelated N", "Unrelated N with < 0.1 missingness", "Unrelated N with < 0.1 missingness and MDD phenotype"))
+sample_QC <- data.table(GENE= gene, Total=length(unique(missing$INDV)), Unrelated=length(unique(unrelated$V1)), Unrelated_missing_0.1=length(unique(unrelated_missing$V1)), Unrelated_missing_0.1_mdd = length(unique(unrelated_mdd$V1)))
+write.table(sample_QC, paste0(gene, "_sampleQC_num.tsv"), sep = "\t", row.names = F)
 # write out the unrelated IDs
 print(paste0("Writing out the sample list to unrelated_nomiss_mdd_", gene, "_idlist.id"))
 readr::write_lines(unrelated_mdd$V1, paste0("unrelated_nomiss_mdd_", gene, "_idlist.id"))
