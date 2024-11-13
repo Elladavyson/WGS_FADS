@@ -10,13 +10,13 @@ library(ggpubr)
 # Read in the FADS coordinates used to index the VCF files 
 fads <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
 # Filter to the genes which we have available now (not FADS1 or FADS2 due to the 3090 file)
-fads <- fads %>% filter(hgnc_symbol %in% c("FADS1", "FADS2")==FALSE)
+fads <- fads %>% filter(hgnc_symbol %in% c("FADS2")==FALSE)
 # Read in the variants files
 for (i in c(1:nrow(fads))) {
     gene <- fads$hgnc_symbol[i]
     print(gene)
     print(paste0("gene_co-ordinates: ", fads$start_position[i], "-", fads$end_position[i]))
-    gene_table <- read.table(paste0(gene, "_variants.tsv"), sep = "\t")
+    gene_table <- read.table(paste0(gene, "_QC_variants.tsv"), sep = "\t")
     colnames(gene_table) <- c("CHR", "POS", "REF", "ALT", "FILTER", "AC", "AN")
     gene_table <- gene_table %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT), 
     AF = AC/AN)
@@ -42,4 +42,4 @@ labs(x = "UKB Allele Frequency Range", y = "Count", title=paste0(gene, ":", nrow
 assign(paste0(gene, "_AF_plt"), gene_af_plot)
 }
 
-ggsave(filename = "AF_barplots.png", ggarrange(MYRF_AF_plt, FEN1_AF_plt, FADS3_AF_plt, TMEM258_AF_plt), width = 10, height = 8, device = "png", dpi = 300)
+ggsave(filename = "AF_barplots.png", ggarrange(MYRF_AF_plt, FEN1_AF_plt, FADS1_AF_plt, FADS3_AF_plt, TMEM258_AF_plt), width = 10, height = 8, device = "png", dpi = 300)
