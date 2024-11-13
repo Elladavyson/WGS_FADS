@@ -7,10 +7,14 @@ if (!requireNamespace("optparse")) {
 if (!requireNamespace("readr")) {
   install.packages("readr")
 }
+if (!requireNamespace("data.table")) {
+  install.packages("data.table")
+}
 
 library(dplyr)
 library(optparse)
 library(readr)
+library(data.table)
 
 parse <- OptionParser()
 
