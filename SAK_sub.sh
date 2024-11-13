@@ -218,9 +218,9 @@ run_index="bcftools index --tbi FADS2_combined.vcf.gz"
 
  run_qc="bash qc_filters.sh FADS2"
    dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz" \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz.tbi" \
-  -iin="/Output/gene_VCF_variants/QualControl/FADS2_missing.imiss" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/raw_geneVCFs/FADS2_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/raw_geneVCFs/FADS2_combined.vcf.gz.tbi" \
+  -iin="/Output/gene_VCF_variants/QualControl/sample_missingness/FADS2_missing.imiss" \
   -iin="/Input/ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenScot_v2.id" \
   -iin="/Input/MajorDepression.ukb24262.2021-07.txt" \
   -iin="/Code/qc_filters.sh" \
@@ -231,7 +231,7 @@ run_index="bcftools index --tbi FADS2_combined.vcf.gz"
  --destination="/Output/" \
  --brief --yes
 
- run_query="bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/AC\t%INFO/AN\n' FADS2_combined.vcf.gz > FADS2_variants.tsv"
+ run_query="bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%INFO/AC\t%INFO/AN\n' FADS1_QC_nosamples.vcf.gz > FADS1_QC_variants.tsv"
  dx run swiss-army-knife \
   -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz" \
    -iin="/Output/gene_VCF_variants/gene_vcfs/FADS2_combined.vcf.gz.tbi" \
@@ -255,7 +255,7 @@ run_index="bcftools index --tbi FADS2_combined.vcf.gz"
 
 # The QC script doesn't seem to be filtering on the HWE flag properly, so doing this for each gene too 
 
-  run_HWEfilter="bcftools filter -e 'INFO/HWE < 1e-100 || INFO/HWE == 0 || F_MISSING > 0.1' FEN1_varqc_sampqc_comb.vcf.gz -Oz -o FEN1_varqc_sampqc_HWE_combined.vcf.gz"
+  run_HWEfilter="bcftools filter -e 'INFO/HWE < 1e-100 || INFO/HWE == 0 || F_MISSING > 0.1' MYRF_varqc_sampqc_comb.vcf.gz -Oz -o MYRF_varqc_sampqc_HWE_combined.vcf.gz"
  dx run swiss-army-knife \
   -iin="/Output/FEN1_varqc_sampqc_comb.vcf.gz" \
  -icmd="${run_HWEfilter}" \
@@ -286,12 +286,12 @@ dx run swiss-army-knife \
  --destination="/Output/" \
  --brief --yes
 
-  strip_samples="bcftools view -S ^unrelated_nomiss_mdd_FEN1_idlist.id FEN1_varqc_sampqc_HWE_combined.vcf.gz -Oz -o FEN1_QC_nosamples.vcf.gz"
+  strip_samples="bcftools view -S ^unrelated_nomiss_mdd_MYRF_idlist.id MYRF_varqc_sampqc_HWE_combined.vcf.gz -Oz -o MYRF_QC_nosamples.vcf.gz"
 dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FEN1_varqc_sampqc_HWE_combined.vcf.gz" \
-  -iin="/Output/gene_VCF_variants/QualControl/sample_list/unrelated_nomiss_mdd_FEN1_idlist.id" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/MYRF_varqc_sampqc_HWE_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/QualControl/sample_list/unrelated_nomiss_mdd_MYRF_idlist.id" \
  -icmd="${strip_samples}" \
- --tag="FEN1 strip samples" \
+ --tag="MYRF strip samples" \
  --instance-type "mem1_hdd1_v2_x8" \
  --destination="/Output/" \
  --brief --yes
