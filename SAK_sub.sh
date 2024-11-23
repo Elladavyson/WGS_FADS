@@ -295,3 +295,14 @@ dx run swiss-army-knife \
  --instance-type "mem1_hdd1_v2_x8" \
  --destination="/Output/" \
  --brief --yes
+
+  query_pri_genotypes="bcftools view -S sample_missingFADS1.id FADS1_combined.vcf.gz | bcftools query -f '[%CHROM\t%POS\t%REF\t%ALT\t%SAMPLE\t%GT\n]' > FADS1_nsample_oQC_missing_genotypes.tsv"
+    dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz.tbi" \
+  -iin="sample_missingFADS1.id" \
+ -icmd="${query_genotypes}" \
+ --tag="FADS1_geno_missingness_check" \
+ --instance-type "mem1_hdd1_v2_x36" \
+ --destination="/Output/" \
+ --brief --yes
