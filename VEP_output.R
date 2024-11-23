@@ -7,6 +7,7 @@ library(data.table)
 library(ggplot2)
 library(ggpubr)
 library(UpSetR)
+library(tidyr)
 library(optparse)
 
 ######## OPTION SET UP  ##############
@@ -74,7 +75,7 @@ ungroup()
 length(unique(annotated$chr_pos_ref_alt))
 
 # Read in variant allele frequency 
-internal_AF <- read.table("~/edavyson/WGS_FADS/QC/FADS1_QC_variants.tsv", sep = "\t")
+internal_AF <- read.table(paste0("~/edavyson/WGS_FADS/QC/", gene, "_QC_variants.tsv"), sep = "\t")
  colnames(internal_AF) <- c("CHR", "POS", "REF", "ALT", "FILTER", "AC", "AN")
 internal_AF <- internal_AF %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT), 
     AF = AC/AN)
@@ -148,6 +149,8 @@ lof_plt  <- ggplot(annotated_rare %>% filter(LoF != '-'), aes(x = LoF, fill = Lo
   labs(x = "LoFTEE Score", y = "Count",title = paste0("LOFTEE rating for rare variants annotated to canonical transcript of ", gene)) +
   geom_text(stat='count',aes(label=after_stat(count),vjust=-1, color = LoF)) +
   theme_minimal() + 
+    scale_fill_manual(values = c("HC" = "red", "LC"="black", "OS"="lightblue", "." = "black")) +  # Color bars
+  scale_color_manual(values = c("HC" = "red", "LC"="black", "OS"="lightblue", "." = "black"))+
     guides(color = "none")
 png(paste0(plot_dir, "/LoFTee_", gene, ".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
@@ -257,10 +260,11 @@ priority_write <- priority %>%
   select(CHROM, POS)
 
 # List of the identifiers (CHR-POS-REF-ALT)
-readr::write_lines(priority$chr_pos_ref_alt, paste0(file_dir, "_priority_annot_chrposrefalt_.txt"))
+readr::write_lines(priority$chr_pos_ref_alt, paste0(file_dir, gene,"_priority_annot_chrposrefalt.txt"))
 
 # BCFTOOLS -R file is two columns CHR and POS
 
-write.table(priority_write, paste0(file_dir, "_priority_annot_chrpos_.tsv"),
+write.table(priority_write, paste0(file_dir, gene, "_priority_annot_chrpos.tsv"),
                                   col.names = F, row.names = F, quote =F, sep = '\t')
 
+sink()
