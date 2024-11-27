@@ -4,6 +4,8 @@
 # dx download /Output/gene_VCF_variants/QualControl/variant_QC/*
 library(ggplot2)
 library(dplyr)
+library(ggpubr) # Need to install on R post workbench
+library(tidyr)
 # Read in the FADS coordinates used to index the VCF files 
 fads <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
 for (i in c(1:nrow(fads))) {
@@ -25,10 +27,10 @@ unrelated <- read.table("ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenSco
 unrelated_missing <- merge(unrelated, missing, by.x = "V1", by.y = "INDV")
 missingness_hist <- ggplot(unrelated_missing, aes(x = F_MISS)) + 
 geom_histogram() + geom_vline(xintercept  = 0.1, color = "red", linetype = "dashed")+ 
-theme_minimal() + labs(x = "Proportion of variants missing", y = "Count", title = paste0(gene, ": Unrelated EUR, N = ", nrow(unrelated_missing)))
+theme_minimal() + labs(x = "Proportion of variants missing", y = "Count", title = gene)
 assign(paste0(gene, "_missing_hist"), missingness_hist)
 }
-ggsave(filename = "missingness_hists.png", ggarrange(MYRF_missing_hist, FEN1_missing_hist, FADS1_missing_hist, FADS2_missing_hist, FADS3_missing_hist, TMEM258_missing_hist), width = 10, height = 8, device = "png", dpi = 300)
+ggsave(filename = "missingness_hists.png", ggarrange(FADS1_missing_hist, FADS2_missing_hist, FADS3_missing_hist, FEN1_missing_hist, MYRF_missing_hist, TMEM258_missing_hist), width = 10, height = 8, device = "png", dpi = 300)
 
 tmem_missing <- read.table("TMEM258_sampleQC_num.tsv", sep = '\t', header =T )
 fads1_missing <- read.table("FADS1_sampleQC_num.tsv", sep = '\t', header =T )
@@ -55,7 +57,6 @@ ggsave(filename = "sample_qc_summarybar.png", sample_qc_bar, width = 8, height =
 # dx upload missingness_hists.png
 # dx upload all_sample_qc.tsv
 # dx upload all_fads_sample_qc.tsv
-fads <- fads %>% filter(hgnc_symbol != "FADS2")
 
 for (i in c(1:nrow(fads))) {
     gene <- fads$hgnc_symbol[i]
@@ -76,7 +77,7 @@ for (i in c(1:nrow(fads))) {
 
 }
 
-variant_qc_summary <- rbind(FADS1_qc_summary,FADS3_qc_summary, TMEM258_qc_summary, MYRF_qc_summary, FEN1_qc_summary)
+variant_qc_summary <- rbind(FADS1_qc_summary,FADS2_qc_summary, FADS3_qc_summary,FEN1_qc_summary,MYRF_qc_summary, TMEM258_qc_summary)
 
 variant_qc_long <-  variant_qc_summary %>%
     pivot_longer(cols = -GENE, 
