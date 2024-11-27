@@ -277,21 +277,21 @@ run_index="bcftools index --tbi FADS2_combined.vcf.gz"
  --destination="/Output/" \
  --brief --yes
 
- extract_qc_metrics="bcftools query -f "%CHROM\t%POS\t%REF\t%ALT\t%INFO/F_MISSING\t%INFO/HWE\n" MYRF_combined_tag.vcf.gz > MYRF_all_qcmetrics.tsv"
+ extract_qc_metrics="bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%INFO/F_MISSING\t%INFO/HWE\n' FADS2_combined_tag.vcf.gz > FADS2_all_qcmetrics.tsv"
 dx run swiss-army-knife \
-  -iin="/Output/MYRF_combined_tag.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FADS2_combined_tag.vcf.gz" \
  -icmd="${extract_qc_metrics}" \
  --tag="QC metrics" \
- --instance-type "mem1_hdd1_v2_x8" \
+ --instance-type "mem1_ssd1_v2_x8" \
  --destination="/Output/" \
  --brief --yes
 
-  strip_samples="bcftools view -S ^unrelated_nomiss_mdd_MYRF_idlist.id MYRF_varqc_sampqc_HWE_combined.vcf.gz -Oz -o MYRF_QC_nosamples.vcf.gz"
+  strip_samples="bcftools view -S ^unrelated_nomiss_mdd_FADS2_idlist.id FADS2_varqc_sampqc_comb.vcf.gz -Oz -o FADS2_QC_nosamples.vcf.gz"
 dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/MYRF_varqc_sampqc_HWE_combined.vcf.gz" \
-  -iin="/Output/gene_VCF_variants/QualControl/sample_list/unrelated_nomiss_mdd_MYRF_idlist.id" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FADS2_varqc_sampqc_comb.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/QualControl/sample_list/unrelated_nomiss_mdd_FADS2_idlist.id" \
  -icmd="${strip_samples}" \
- --tag="MYRF strip samples" \
+ --tag="FADS2 strip samples" \
  --instance-type "mem1_hdd1_v2_x8" \
  --destination="/Output/" \
  --brief --yes
@@ -304,5 +304,16 @@ dx run swiss-army-knife \
  -icmd="${query_genotypes}" \
  --tag="FADS1_geno_missingness_check" \
  --instance-type "mem1_hdd1_v2_x36" \
+ --destination="/Output/" \
+ --brief --yes
+
+ check_zeroAC="bcftools query -R FEN1_QC_var_zeroAC.tsv -f '%CHROM\t%POS\t%REF\t%ALT\t%AC\t%AN\n' FEN1_combined.vcf.gz > FEN1_AC_all_qczero.tsv"
+     dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/raw_geneVCFs/FEN1_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/raw_geneVCFs/FEN1_combined.vcf.gz.tbi" \
+  -iin="FEN1_QC_var_zeroAC.tsv" \
+ -icmd="${check_zeroAC}" \
+ --tag="FEN1_AC_check_for_variants_withACzero_inQC" \
+ --instance-type "mem1_ssd1_v2_x8" \
  --destination="/Output/" \
  --brief --yes
