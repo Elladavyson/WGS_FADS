@@ -59,11 +59,11 @@ print(paste0("Results from this script saved to: ", file_dir))
   ordered = TRUE)
 print("Reading in the VEP output file")
 # Read in the VEP output file 
-vep_output <- fread(paste0(gene, "_QC_nosamples_vepannot.vcf_annotated_hdr.tsv"), sep = "\t")
+vep_output <- fread(paste0("VEP_output/", gene, "_QC_nosamples_vepannot.vcf_annotated_hdr.tsv"), sep = "\t")
 print("How many variant annotations back from VEP")
 # Check how many variants in the file 
-print("Filtering to the canonical transcript")
 length(unique(vep_output$chr_pos_ref_alt))
+print("Filtering to the canonical transcript")
 # Filter to the canonical transcript
 vep_output_canonical <- vep_output %>% filter(CANONICAL == "YES")
 length(unique(vep_output_canonical$chr_pos_ref_alt))
@@ -91,8 +91,10 @@ annotated_internalAF <- annotated_internalAF %>%
     meets_filter = ifelse(AF < 0.01 & (gnomADg_AF_nfe < 0.01 | gnomADg_AF_nfe == "-"), 
                           "Yes", "No")
   )
-print("Removing the variants which have an allele count of 0 after variant and sample QC, n =", 
-length(unique(annotated_internalAF %>% filter(AC==0) %>% pull(chr_pos_ref_alt))))
+print(paste0("Removing the variants which have an allele count of 0 after variant and sample QC, n = ", annotated_internalAF %>% 
+filter(AC==0) %>% 
+pull(chr_pos_ref_alt) %>% 
+unique() %>% length()))
 annotated_internalAF <- annotated_internalAF %>%
 filter(AC !=0)
 
@@ -126,6 +128,7 @@ dev.off()
 
 # What is the distribution of the allele count in UKB of the rare variants?
 print('The distribution of Allele Count in the rare variants (AC > 0)')
+table(annotated_rare$AC)
 AC_counts <- annotated_rare %>% mutate(
 range = case_when(
   AC == 1 ~ "1",
@@ -134,12 +137,11 @@ range = case_when(
   AC >= 10 & AC < 50 ~ "< 50",
   AC >= 50 & AC < 100 ~ "< 100",
   AC >= 100 & AC < 1000 ~ "< 1000",
-  AC >= 1000 & AC < 10000 ~ "< 10000",
-  AC >= 10000 ~ ">= 10000"
+  AC >= 1000 & AC < 10000 ~ "> 1000"
 )
   ) %>%
   count(range) %>% 
-  mutate(range = factor(range, levels = c("1", "< 5", "< 10", "< 50", "< 100", "< 1000", "< 10000", ">= 10000")))
+  mutate(range = factor(range, levels = c("1", "< 5", "< 10", "< 50", "< 100", "< 1000", "> 1000")))
 
 AC_counts_barplot <- ggplot(AC_counts, aes(x=range, y = n)) + 
   geom_bar(stat="identity", fill = "skyblue")+
@@ -177,7 +179,7 @@ lof_plt  <- ggplot(annotated_rare %>% filter(LoF != '-'), aes(x = LoF, fill = Lo
     scale_fill_manual(values = c("HC" = "red", "LC"="black", "OS"="lightblue", "." = "black")) +  # Color bars
   scale_color_manual(values = c("HC" = "red", "LC"="black", "OS"="lightblue", "." = "black"))+
     guides(color = "none")
-print(paste0("Saving plot of LoFTee annotations to: ", plot_dir, "/LoFTee_", gene, ".png"))
+print(paste0("Saving plot of LoFTee annotations to: ", plot_dir, "LoFTee_", gene, ".png"))
 png(paste0(plot_dir, "/LoFTee_", gene, ".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
 lof_plt
@@ -190,14 +192,14 @@ cadd_plt <- ggplot(annotated_rare, aes(x = CADD_PHRED)) +
        title = paste0("CADD scores for rare variants annotated to canonical transcript of ", gene)) + 
   theme_minimal() +
   geom_vline(xintercept = 20, linetype = "dashed", color = "red") 
-print(paste0("Saving plot of the CADD score distribution to: ", plot_dir, "/CADD_", gene ,".png"))
+print(paste0("Saving plot of the CADD score distribution to: ", plot_dir, "CADD_", gene ,".png"))
 png(paste0(plot_dir, "/CADD_", gene ,".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
 cadd_plt
 dev.off() 
 
 ## REVEL 
-print(paste0("Saving plot of the REVEL score distribution to: ", plot_dir, "/REVEL_", gene, ".png"))
+print(paste0("Saving plot of the REVEL score distribution to: ", plot_dir, "REVEL_", gene, ".png"))
 png(paste0(plot_dir, "/REVEL_", gene, ".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
 ggplot(annotated_rare, aes(x = as.numeric(REVEL), fill = as.factor(REVEL >= 0.5))) + geom_histogram() +
@@ -239,6 +241,21 @@ priority <- annotated_rare %>%
          (CADD_PHRED >= 20) |
          (IMPACT == "HIGH" | IMPACT == "MODERATE") |
          (REVEL >= 0.5))
+
+print(paste0("There are ", length(unique(priority$chr_pos_ref_alt)), " variants prioritised with at least one criteria for loss of function"))
+
+# What are the consequences annotated to the prioritised variants 
+csq_pri_plot <- ggplot(priority, aes(x = reorder(Consequence, table(Consequence)[Consequence]), 
+                                      fill = reorder(IMPACT, table(Consequence)[Consequence]))) +
+  geom_bar(stat = 'count') + theme_bw() + 
+ labs(x = "Consequence", y = "N", title = paste0(gene, " prioritised variant VEP consequences"), fill = "VEP IMPACT") +
+  coord_flip() + geom_text(stat = 'count', aes(label = after_stat(count)), hjust = -0.1) + 
+  theme(legend.position = "top")
+print(paste0("Saving plot of VEP consequences to: ", plot_dir, "CSQ_priority", gene, ".png"))
+  png(paste0(plot_dir, "CSQ_priority", gene, ".png"), 
+    width = 5000, height = 2000, res = 300, type = "cairo")
+csq_pri_plot
+dev.off()
 
 # Create the list of annotations for the UpSetR plot (only those with variants)
 CADD_lst <- annotated_rare %>%
@@ -282,6 +299,34 @@ png(paste0(plot_dir, "/UpSet_", gene, ".png"),
 upset_plt
 dev.off()
 
+# What is the distribution of the allele count in UKB of the prioritised variants
+print('The distribution of Allele Count in the prioritised variants')
+table(priority$AC)
+priority_AC_counts <- priority %>% mutate(
+range = case_when(
+  AC == 1 ~ "1",
+  AC > 1 & AC < 5 ~ "< 5",
+  AC >= 5 & AC < 10 ~ "< 10",
+  AC >= 10 & AC < 50 ~ "< 50",
+  AC >= 50 & AC < 100 ~ "< 100",
+  AC >= 100 & AC < 1000 ~ "< 1000",
+  AC >= 1000 & AC < 10000 ~ "> 1000"
+)
+  ) %>%
+  count(range) %>% 
+  mutate(range = factor(range, levels = c("1", "< 5", "< 10", "< 50", "< 100", "< 1000", "> 1000")))
+
+priority_AC_counts_barplot <- ggplot(priority_AC_counts, aes(x=range, y = n)) + 
+  geom_bar(stat="identity", fill = "skyblue")+
+  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 2) + 
+  labs(x = "UKB Allele Count", y = "Count", title="UKB Allele Count (prioritised variants)") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+  png(paste0(plot_dir, "AC_hist_prioritised", gene, ".png"), 
+    width = 3000, height = 3000, res = 300, type = "cairo")
+priority_AC_counts_barplot
+dev.off()
 
 ## Save the full list of priority variants with annotations 
 print(paste0("Saving the priority variants with annotation information to: ", file_dir, gene, "_priority_annot.tsv"))
