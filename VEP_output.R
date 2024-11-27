@@ -21,7 +21,7 @@ opt <- parse_args(OptionParser(option_list=option_list), args = args)
 
 gene <- opt$gene
 
-file_dir <-paste0(getwd(), "/", gene, "_vepoutput_proc/")
+file_dir <-paste0(getwd(), "/AC_overzero/", gene, "_vepoutput_proc/")
 # Check if the directory exists
 if (!dir.exists(file_dir)) {
   # If it doesn't exist, create the directory
@@ -32,7 +32,7 @@ if (!dir.exists(file_dir)) {
 }
 
 sink(paste0(file_dir, gene, "_vepoutput.log"))
-
+print(paste0("Results from this script saved to: ", file_dir))
   vep_consequence <- factor(c("transcript_ablation", "splice_acceptor_variant", "splice_donor_variant", 
   "stop_gained", "frameshift_variant", "stop_lost", "start_lost", "transcript_amplification", "feature_elongation", 
   "feature_truncation", "inframe_insertion", "inframe_deletion", "missense_variant", "protein_altering_variant", 
@@ -57,15 +57,18 @@ sink(paste0(file_dir, gene, "_vepoutput.log"))
              "regulatory_region_ablation", "regulatory_region_amplification", 
              "regulatory_region_variant", "intergenic_variant"),
   ordered = TRUE)
-
+print("Reading in the VEP output file")
 # Read in the VEP output file 
 vep_output <- fread(paste0(gene, "_QC_nosamples_vepannot.vcf_annotated_hdr.tsv"), sep = "\t")
+print("How many variant annotations back from VEP")
 # Check how many variants in the file 
+print("Filtering to the canonical transcript")
 length(unique(vep_output$chr_pos_ref_alt))
 # Filter to the canonical transcript
 vep_output_canonical <- vep_output %>% filter(CANONICAL == "YES")
 length(unique(vep_output_canonical$chr_pos_ref_alt))
 # For variants with multiple consequences, filter to the most severe 
+print("If multiple consequences per variant, filtering to the most severe")
 vep_output_canonical <- vep_output_canonical %>% mutate(Consequence_factor = factor(Consequence, levels = levels(vep_consequence), ordered = TRUE))
 vep_output_canonical$chr_pos_ref_alt <- gsub(':', '_', vep_output_canonical$chr_pos_ref_alt)
 annotated <- vep_output_canonical %>% 
@@ -75,26 +78,33 @@ ungroup()
 length(unique(annotated$chr_pos_ref_alt))
 
 # Read in variant allele frequency 
+print(paste0("Reading in the internal Allele Frequency file from ", "~/edavyson/WGS_FADS/QC/", gene, "_QC_variants.tsv"))
 internal_AF <- read.table(paste0("~/edavyson/WGS_FADS/QC/", gene, "_QC_variants.tsv"), sep = "\t")
  colnames(internal_AF) <- c("CHR", "POS", "REF", "ALT", "FILTER", "AC", "AN")
 internal_AF <- internal_AF %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT), 
     AF = AC/AN)
 
+print("Merging the VEP output with the UKB allele frequency file")
 annotated_internalAF <- merge(annotated, internal_AF, by = "chr_pos_ref_alt")
 annotated_internalAF <- annotated_internalAF %>%
   mutate(
     meets_filter = ifelse(AF < 0.01 & (gnomADg_AF_nfe < 0.01 | gnomADg_AF_nfe == "-"), 
                           "Yes", "No")
   )
+print("Removing the variants which have an allele count of 0 after variant and sample QC, n =", 
+length(unique(annotated_internalAF %>% filter(AC==0) %>% pull(chr_pos_ref_alt))))
+annotated_internalAF <- annotated_internalAF %>%
+filter(AC !=0)
 
 # Filter to rare variants 
+print("Filtering to rare variants based off UKB AF < 0.01 AND gnomAD AF < 0.01 (or absent in gnomAD)")
 annotated_rare <- annotated_internalAF %>% filter(AF < 0.01 & (gnomADg_AF_nfe < 0.01 | gnomADg_AF_nfe == "-"))
+# Converting the CADD and REVEL scores to numerical variables
 annotated_rare$CADD_PHRED <- as.numeric(annotated_rare$CADD_PHRED)
 annotated_rare$REVEL <- as.numeric(annotated_rare$REVEL)
 
 ## Setting up plots directory 
-
-plot_dir <-paste0(getwd(), "/", gene, "_priority_plots/")
+plot_dir <-paste0(getwd(), "/AC_overzero/", gene, "_priority_plots/")
 # Check if the directory exists
 if (!dir.exists(plot_dir)) {
   # If it doesn't exist, create the directory
@@ -104,6 +114,7 @@ if (!dir.exists(plot_dir)) {
   message("Plot Directory already exists: ", plot_dir)
 }
 # How many variants meet the rare criteria
+print(paste0("How many rare variants: ", length(unique(annotated_internalAF %>% filter(meets_filter=="Yes") %>% pull(chr_pos_ref_alt)))))
 af_filter_plt <- ggplot(annotated_internalAF, aes(x = meets_filter)) + geom_bar(stat="count") + 
 labs(x = "Variants with AF < 0.01 and gnomADg_AF_nfe < 0.01 or -", y = "Number of variants", title = gene) + 
 theme_minimal()
@@ -114,18 +125,32 @@ af_filter_plt
 dev.off()
 
 # What is the distribution of the allele count in UKB of the rare variants?
+print('The distribution of Allele Count in the rare variants (AC > 0)')
+AC_counts <- annotated_rare %>% mutate(
+range = case_when(
+  AC == 1 ~ "1",
+  AC > 1 & AC < 5 ~ "< 5",
+  AC >= 5 & AC < 10 ~ "< 10",
+  AC >= 10 & AC < 50 ~ "< 50",
+  AC >= 50 & AC < 100 ~ "< 100",
+  AC >= 100 & AC < 1000 ~ "< 1000",
+  AC >= 1000 & AC < 10000 ~ "< 10000",
+  AC >= 10000 ~ ">= 10000"
+)
+  ) %>%
+  count(range) %>% 
+  mutate(range = factor(range, levels = c("1", "< 5", "< 10", "< 50", "< 100", "< 1000", "< 10000", ">= 10000")))
 
-ac_hist <- ggplot(annotated_rare, aes(x = AC)) + geom_histogram(fill = "skyblue") + 
-labs(x = "Allele Count of variant", y = "Count", title = paste0(gene, ": distribution of allele count of rare variants"))
-
-ac_hist_zoom <- ggplot(annotated_rare, aes(x = AC)) + geom_histogram(binwidth=1, fill = "skyblue", boundary = 0) + 
-labs(x = "Allele Count of variant", y="Count", title = paste0(gene, ": distribution of allele count of rare variants (0-25)")) +
-xlim(0,25) + stat_bin(binwidth = 1, geom = "text", aes(label = ..count..), vjust = -0.5, boundary = 0)
-
+AC_counts_barplot <- ggplot(AC_counts, aes(x=range, y = n)) + 
+  geom_bar(stat="identity", fill = "skyblue")+
+  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 2) + 
+  labs(x = "UKB Allele Count", y = "Count", title="UKB Allele Count (post-QC + rare variants)") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
   png(paste0(plot_dir, "AC_hist_rare", gene, ".png"), 
     width = 3000, height = 3000, res = 300, type = "cairo")
-ggarrange(ac_hist, ac_hist_zoom, nrow = 2, ncol =1 )
+AC_counts_barplot
 dev.off()
 
 # What are the consequences annotated to the rare variants 
@@ -135,7 +160,7 @@ csq_plot <- ggplot(annotated_rare, aes(x = reorder(Consequence, table(Consequenc
  labs(x = "Consequence", y = "N", title = paste0(gene, " rare variant VEP Consequences"), fill = "VEP IMPACT") +
   coord_flip() + geom_text(stat = 'count', aes(label = after_stat(count)), hjust = -0.1) + 
   theme(legend.position = "top")
-
+print(paste0("Saving plot of VEP consequences to: ", plot_dir, "CSQ_rare", gene, ".png"))
   png(paste0(plot_dir, "CSQ_rare", gene, ".png"), 
     width = 5000, height = 2000, res = 300, type = "cairo")
 csq_plot
@@ -152,6 +177,7 @@ lof_plt  <- ggplot(annotated_rare %>% filter(LoF != '-'), aes(x = LoF, fill = Lo
     scale_fill_manual(values = c("HC" = "red", "LC"="black", "OS"="lightblue", "." = "black")) +  # Color bars
   scale_color_manual(values = c("HC" = "red", "LC"="black", "OS"="lightblue", "." = "black"))+
     guides(color = "none")
+print(paste0("Saving plot of LoFTee annotations to: ", plot_dir, "/LoFTee_", gene, ".png"))
 png(paste0(plot_dir, "/LoFTee_", gene, ".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
 lof_plt
@@ -164,13 +190,14 @@ cadd_plt <- ggplot(annotated_rare, aes(x = CADD_PHRED)) +
        title = paste0("CADD scores for rare variants annotated to canonical transcript of ", gene)) + 
   theme_minimal() +
   geom_vline(xintercept = 20, linetype = "dashed", color = "red") 
+print(paste0("Saving plot of the CADD score distribution to: ", plot_dir, "/CADD_", gene ,".png"))
 png(paste0(plot_dir, "/CADD_", gene ,".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
 cadd_plt
 dev.off() 
 
 ## REVEL 
-
+print(paste0("Saving plot of the REVEL score distribution to: ", plot_dir, "/REVEL_", gene, ".png"))
 png(paste0(plot_dir, "/REVEL_", gene, ".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
 ggplot(annotated_rare, aes(x = as.numeric(REVEL), fill = as.factor(REVEL >= 0.5))) + geom_histogram() +
@@ -181,11 +208,16 @@ ggplot(annotated_rare, aes(x = as.numeric(REVEL), fill = as.factor(REVEL >= 0.5)
   # 6350 have '-'
 dev.off()
 
-table(annotated_rare$CADD_PHRED > 30)
+print("How many variants have a scaled CADD score > 20")
+table(annotated_rare$CADD_PHRED > 20)
+print("Distribution of VEP IMPACT scores")
 table(annotated_rare$IMPACT)
+print("Distribution of LOFTEE High and Low Confidence")
 table(annotated_rare$LoF)
-table(annotated$REVEL > 5)
+print("How many variants have a REVEL score > 0.5")
+table(annotated$REVEL > 0.5)
 
+print("Establishing a list of priority variants, i.e those which fit any one of the above criteria")
 priority <- annotated_rare %>%
   mutate(priority_criteria = case_when(
     LoF == "HC" | LoF == "OS" ~ "LoF: HC/OS",
@@ -242,7 +274,7 @@ if (length(VEP_IMPACT_lst) > 0) {
 if (length(REVEL_lst) > 0) {
   VEP_annotations$REVEL <- REVEL_lst
 }
-
+print(paste0("Creating an Upset plot of the priority criteria, saved: ", plot_dir, "/UpSet_", gene, ".png"))
 upset_plt <- upset(fromList(VEP_annotations), nsets = length(VEP_annotations), set_size.show = TRUE, order.by = 'freq')
 # Plot the Upset Plot
 png(paste0(plot_dir, "/UpSet_", gene, ".png"), 
@@ -252,19 +284,25 @@ dev.off()
 
 
 ## Save the full list of priority variants with annotations 
+print(paste0("Saving the priority variants with annotation information to: ", file_dir, gene, "_priority_annot.tsv"))
 write.table(priority, paste0(file_dir, gene, "_priority_annot.tsv"), row.names = F, quote =F, sep = '\t')
 
 ## Save a list of the priority variants (for extracting the genotypes)
+print(paste0("Saving a list of the priority variants CHR and POS for extracting the genotypes to: ", file_dir, gene, "_priority_annot_chrpos.tsv"))
 priority_write <- priority %>%
   separate(chr_pos_ref_alt, into = c("CHROM", "POS", "REF", "ALT"), sep = "_", remove = FALSE) %>% 
   select(CHROM, POS)
-
-# List of the identifiers (CHR-POS-REF-ALT)
-readr::write_lines(priority$chr_pos_ref_alt, paste0(file_dir, gene,"_priority_annot_chrposrefalt.txt"))
 
 # BCFTOOLS -R file is two columns CHR and POS
 
 write.table(priority_write, paste0(file_dir, gene, "_priority_annot_chrpos.tsv"),
                                   col.names = F, row.names = F, quote =F, sep = '\t')
+
+# List of the identifiers (CHR-POS-REF-ALT)
+print(paste0("Saving a list of chr_pos_ref_alt identifiers of the priority variants to: ", file_dir, gene,"_priority_annot_chrposrefalt.txt"))
+print("This is to make sure that the genotypes extracted are for the correct priority variant and not another variant with the same position but different REF and ALT, as bcftools uses just the CHR and POS variables")
+readr::write_lines(priority$chr_pos_ref_alt, paste0(file_dir, gene,"_priority_annot_chrposrefalt.txt"))
+
+print("All done! (for now :))")
 
 sink()
