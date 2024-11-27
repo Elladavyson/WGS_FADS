@@ -296,17 +296,6 @@ dx run swiss-army-knife \
  --destination="/Output/" \
  --brief --yes
 
-  query_pri_genotypes="bcftools view -S sample_missingFADS1.id FADS1_combined.vcf.gz | bcftools query -f '[%CHROM\t%POS\t%REF\t%ALT\t%SAMPLE\t%GT\n]' > FADS1_nsample_oQC_missing_genotypes.tsv"
-    dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz" \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/FADS1_combined.vcf.gz.tbi" \
-  -iin="sample_missingFADS1.id" \
- -icmd="${query_genotypes}" \
- --tag="FADS1_geno_missingness_check" \
- --instance-type "mem1_hdd1_v2_x36" \
- --destination="/Output/" \
- --brief --yes
-
  check_zeroAC="bcftools query -R FEN1_QC_var_zeroAC.tsv -f '%CHROM\t%POS\t%REF\t%ALT\t%AC\t%AN\n' FEN1_combined.vcf.gz > FEN1_AC_all_qczero.tsv"
      dx run swiss-army-knife \
   -iin="/Output/gene_VCF_variants/gene_vcfs/raw_geneVCFs/FEN1_combined.vcf.gz" \
@@ -314,6 +303,16 @@ dx run swiss-army-knife \
   -iin="FEN1_QC_var_zeroAC.tsv" \
  -icmd="${check_zeroAC}" \
  --tag="FEN1_AC_check_for_variants_withACzero_inQC" \
+ --instance-type "mem1_ssd1_v2_x8" \
+ --destination="/Output/" \
+ --brief --yes
+
+query_pri_genotypes="bcftools view -R FEN1_priority_annot_chrpos.tsv FEN1_varqc_sampqc_HWE_combined.vcf.gz | bcftools query -f '[%CHROM\t%POS\t%REF\t%ALT\t%SAMPLE\t%GT\n]' > FEN1_priority_genotypes.tsv"
+  dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/variants/FEN1_priority_annot_chrpos.tsv" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FEN1_varqc_sampqc_HWE_combined.vcf.gz" \
+ -icmd="${query_pri_genotypes}" \
+ --tag="Extract_FEN1_priority_genotypes" \
  --instance-type "mem1_ssd1_v2_x8" \
  --destination="/Output/" \
  --brief --yes
