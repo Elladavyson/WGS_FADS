@@ -28,10 +28,10 @@ as.data.frame() %>%
 select(-Sequence) %>% 
 filter(!grepl('sequence', `Exon / Intron`)) %>%
 mutate(ExonIntron = ifelse(grepl('Intron',`Exon / Intron`), "Intron", "Exon"))%>% 
-mutate(color_for_lolliplot = ifelse(ExonIntron=="Intron","skyblue","magenta"))
+mutate(color_for_lolliplot = ifelse(ExonIntron=="Intron","#51C6E6","#FF8833"))
 
 # Carrier genotype info
-carriers_genotypes <- read.table(paste0(gene, "_carrier_genotypes.tsv"), sep = '\t', header = T)
+carriers_genotypes <- read.table(paste0(gene, "_carriers_genotypes.tsv"), sep = '\t', header = T)
 # Variant carrier summary
 variant_carrier_summary <- read.table(paste0(gene, "_variant_count_summary.tsv"), sep = "\t", header = T)
 strand_str = "Forward"
@@ -63,7 +63,7 @@ variant <- variant_carrier_summary %>% mutate(colour_for_lolliplot =
 case_when(zygosity == "Alt-het" ~ "#90EE90",
 zygosity == "Alt_hom_and_alt_het" ~ "#006400", 
 zygosity == "Alt-hom" ~ "#ADD8E6",
-zygosity == "Inconc_comp_het" ~ "lightpink",
+zygosity == "Inconc_comp_het" ~  "lightpink",
 TRUE ~ "No valid zygosity"))
 
 ######### Ranges object for the variants 
@@ -95,6 +95,9 @@ return(color_names)
 }
 legend <- sample.gr$color %>% unique()# legend fill color
 names(legend) <- c(get_color_name(legend))# legend labels
+legend <- list(labels=c("Alt-het" , "Inconc_comp_het"), 
+col = c("#90EE90","lightpink"), 
+fill = c("#90EE90","lightpink"))
 
 ######### Plotting it 
 
@@ -109,10 +112,12 @@ sample.gr.rot <- sample.gr
 sample.gr.rot$label.parameter.label <- ""
 sample.gr.rot$shape <- "circle"
 
+## The legend and the y axis label are not showing ? 
+
 print(paste0("Saving the lolliplot to ", outdir, "lolliplot_variants_all.png"))
 png(paste0(outdir, "lolliplot_variants_all.png"),
     width = 3600, height = 1200, res = 300, type = "cairo")
-lolliplot(sample.gr.rot, features, legend=legend, ylab="Number of Carriers in UKB Sample", cex = 0.001, yaxis = FALSE)
+lolliplot(sample.gr.rot, features, legend=legend, cex = 0.001, yaxis = FALSE, ylab="Number of Carriers in UKB Sample")
 grid.text("Prioritised variants in FEN1", x=.5, y=.9, just="top",
           gp=gpar(cex=1, fontface="bold"))
 dev.off()
