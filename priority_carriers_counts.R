@@ -16,6 +16,14 @@ library(tidyr)
 library(ggplot2)
 library(optparse)
 
+parser <- OptionParser()
+parser <- add_option(parser, c('-g','--gene'), type = 'character', help = 'Gene looking at', metavar = "GENE")
+
+opt=parse_args(parser)
+print(opt)
+
+gene = opt$gene
+
 # Read in the FADS cluster co-ordinates file
 fads_genes <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t" , header = T)
 # The genotypes of the prioritised variants 
@@ -58,6 +66,11 @@ variant_carrier_summary <- variant_carrier_summary %>%
 separate(chr_pos_ref_alt, into = c("CHR", "POS", "REF", "ALT"), sep = "_", remove = FALSE) %>%
 mutate(POS = as.numeric(POS))
 
+var_sum_plt <- ggplot(variant_carrier_summary, aes(x = althet_carriers)) + 
+geom_histogram() + 
+labs(x = "Number of alternate heterozygous carriers per variant", y = "Number of variants", title = paste0(gene, ": prioritised variant carriers")) + 
+theme_minimal() 
+
 # How many variants carried per participant
 
 participant_variant_summary <- genotypes %>% 
@@ -66,12 +79,12 @@ summarise(num_althet_vars = sum(GT=="0/1"),
 num_althom_vars = sum(GT=="1/1"),
 num_altref_vars = sum(GT=="0/0"))
 
-ggplot(participant_variant_summary, 
-aes(x = num_althet_vars, fill = as.factor(num_althet_vars))) + 
+part_var_plt <- ggplot(participant_variant_summary %>% filter(num_althet_vars !=0), 
+aes(x = as.factor(num_althet_vars), fill = as.factor(num_althet_vars))) + 
 geom_bar(stat="count")+  
 geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5) + 
 theme_minimal() + 
-labs(x = "Number of FEN1 prioritised variants carried per individual", y = "Number of participants") +
+labs(x = paste0("Number of ", gene, " prioritised variants carried per individual"), y = "Number of participants", title = paste0(gene, ": prioritised variant carriers")) +
 theme(legend.position="none")
 
 # Extract the carriers 
@@ -120,7 +133,12 @@ carriers_info <- rbind(carriers_genotypes %>%
 
 # Save the carrier variant information, the carrier 'phenotype', the carrier summary and the variant summary
 
-write.table(paste0(gene, "_participant_var_summary.tsv"), participant_variant_summary, sep = '\t', row.names = F, quote = F)
-write.table(paste0(gene, "_variant_count_summary.tsv"), variant_carrier_summary, sep = '\t', row.names = F, quote = F)
-write.table(paste0(gene, "_carrier_info.tsv"), carriers_info, sep = "\t", row.names = F, quote = F)
-write.table(paste0(gene, "_carriers_genotypes.tsv"), carriers_genotypes, sep = "\t", row.names = F, quote =F)
+write.table(participant_variant_summary, paste0(gene, "_participant_var_summary.tsv"), sep = '\t', row.names = F, quote = F)
+write.table(variant_carrier_summary, paste0(gene, "_variant_count_summary.tsv"), sep = '\t', row.names = F, quote = F)
+write.table(carriers_info, paste0(gene, "_carrier_info.tsv"),  sep = "\t", row.names = F, quote = F)
+write.table(carriers_genotypes, paste0(gene, "_carriers_genotypes.tsv"),  sep = "\t", row.names = F, quote =F)
+
+# Save the graphs 
+
+ggsave(filename = paste0(gene, "_pri_carriers_summary.png"), part_var_plt, width = 10, height = 6, device = "png", dpi = 300)
+ggsave(filename = paste0(gene, "_pri_variant_summary.png"), var_sum_plt, width = 10, height = 6, device = "png", dpi = 300)
