@@ -307,12 +307,13 @@ dx run swiss-army-knife \
  --destination="/Output/" \
  --brief --yes
 
-query_pri_genotypes="bcftools view -R FEN1_priority_annot_chrpos.tsv FEN1_varqc_sampqc_HWE_combined.vcf.gz | bcftools query -f '[%CHROM\t%POS\t%REF\t%ALT\t%SAMPLE\t%GT\n]' > FEN1_priority_genotypes.tsv"
+query_pri_genotypes="bash extract_pri_genotypes.sh FADS3"
   dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/variants/FEN1_priority_annot_chrpos.tsv" \
-  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FEN1_varqc_sampqc_HWE_combined.vcf.gz" \
- -icmd="${query_pri_genotypes}" \
- --tag="Extract_FEN1_priority_genotypes" \
- --instance-type "mem1_ssd1_v2_x8" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/FADS3_priority_annot_chrpos.tsv" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FADS3_varqc_sampqc_HWE_combined.vcf.gz" \
+  -iin="/Code/extract_pri_genotypes.sh" \
+  -icmd="${query_pri_genotypes}" \
+ --tag="Extract_FADS3_priority_genotypes" \
+ --instance-type "mem1_ssd1_v2_x4" \
  --destination="/Output/" \
  --brief --yes
