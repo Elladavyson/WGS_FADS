@@ -1,6 +1,7 @@
 library(data.table)
 library(dplyr)
 library(bestNormalize)
+library(ukbnmr)
 
 # carriers info 
 print("Reading in carrier information")
@@ -129,4 +130,81 @@ FEN1_metabolite_carrier_summary <- summary_carrier_status(meta_bl_FEN1)
 # Normalise Metabolomic Measures 
 
 ###################################################################################
+
+# Metabolite measures names 
+nmr_info$matchingmet <- paste('f.', nmr_info$UKB.Field.ID, '.0.0', sep = "")
+
+
+#### functions to get the metabolite name or the short version of the metabolite name ####
+
+## the full name ##
+get_metabolitename <- function(ID_vector) {
+  metabolite_names <- c()
+  for (i in ID_vector){
+    metabolite <- nmr_info$Description[nmr_info$matchingmet == i]
+    metabolite_names <- append(metabolite_names, metabolite)
+  }
+  return(metabolite_names)
+}
+
+## the short name ## 
+get_metaboliteshort <- function(ID_vector) {
+  metabolite_shorts <- c()
+  for(i in ID_vector) {
+    metabolite <- nmr_info$Biomarker[nmr_info$matchingmet == i]
+    metabolite_shorts <- append(metabolite_shorts, metabolite)
+  }
+  return(metabolite_shorts)
+}
+
+# Plot the distributions of the metabolite measures 
+meta_measures <- meta_bl_FEN1 %>% 
+select(starts_with("f.")) %>% 
+pivot_longer(., cols = -c("f.eid"), names_to=c("Metabolite"), values_to=c("Value"))
+ggplot(meta_measures, aes(x = Value)) + geom_histogram() +
+facet_wrap(~Metabolite)
+
+# Normalise the metabolite values 
+norm_meta_bl_FEN1 <- meta_bl_FEN1 %>% 
+mutate(f.23443.0.0 = orderNorm(f.23443.0.0)$x.t,
+f.23450.0.0 = orderNorm(f.23450.0.0)$x.t,
+f.23444.0.0 = orderNorm(f.23444.0.0)$x.t,
+f.23451.0.0 = orderNorm(f.23451.0.0)$x.t,
+f.23459.0.0 = orderNorm(f.23459.0.0)$x.t)
+
+norm_meta_measures <- norm_meta_bl_FEN1 %>% 
+select(starts_with("f.")) %>% 
+rename("Degree of Unsaturation"="f.23443.0.0",
+"Docosahexaenoic Acid" = "f.23450.0.0",
+"Omega-3 Fatty Acids" ="f.23444.0.0",
+"Omega-3 Fatty Acids to Total Fatty Acids percentage"="f.23451.0.0",
+"Omega-6 Fatty Acids to Omega-3 Fatty Acids ratio" = "f.23459.0.0"
+) %>% 
+pivot_longer(., cols = -c("f.eid"), names_to=c("Metabolite"), values_to=c("Value"))
+
+norm_meta_plt <- ggplot(norm_meta_measures, aes(x = Value)) + geom_histogram() +
+facet_wrap(~Metabolite) + 
+theme_minimal() + 
+labs(x = "Normalised Metabolite Value", y = "Count")
+
+ggsave(filename ="norm_metabolite_hists.png", norm_meta_plt, width = 10, height = 6, device = "png", dpi = 300)
+
+###################################################################################
+
+# Distribution of metabolomic data per carriers and non carriers 
+
+###################################################################################
+
+data_summary <- function(x) {
+  m <- mean(x)
+  ymin <- m -sd(x)
+  ymax <- m + sd(x)
+  return(c(y=m, ymin = ymin, ymax = ymax))
+}
+
+meta_dist_plot <- ggplot(norm_meta_bl_FEN1, aes(x = as.factor(status), y = f.23444.0.0, color = as.factor(status), fill = as.factor(status)))+ 
+    geom_violin(trim = FALSE, na.rm = TRUE, alpha= 0.3)+
+    scale_color_brewer(palette = "Dark2", aesthetics= c("colour", "fill"), labels = c("Non-carrier", "Carrier"), name = "Prioritised variant in gene")+ 
+    theme_classic()+geom_jitter(shape = 16, position=position_jitter(0.2), na.rm = TRUE)+stat_summary(fun.data =data_summary, shape = 23, color = "black", na.rm = TRUE) +
+    labs(title = "", x = "" , y='Scaled metabolite measure', xticks = c("Non-carrier","Carrier")) + theme(legend.position= "right", text = element_text(size = 15), plot.title= element_text(face = "bold", hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1))+ scale_x_discrete(labels = c("", ""))
 
