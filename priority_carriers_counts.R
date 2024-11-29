@@ -23,40 +23,54 @@ opt=parse_args(parser)
 print(opt)
 
 gene = opt$gene
-
+sink(paste0(gene, "_summarise_carriers.log"))
+print("--------------------------------------------------")
+print("READING IN DATA")
+print("--------------------------------------------------")
 # Read in the FADS cluster co-ordinates file
+print("Reading in files")
 fads_genes <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t" , header = T)
 # The genotypes of the prioritised variants 
-genotypes <- fread("FEN1_priority_genotypes.tsv", sep = "\t", header = F)
+genotypes <- fread(paste0(gene, "_priority_genotypes.tsv"), sep = "\t", header = F)
 colnames(genotypes) <- c("CHR", "POS", "REF", "ALT", "SAMPLE", "GT")
 genotypes <- genotypes %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT))
 
+print("--------------------------------------------------")
+print("CHECKING VARIANTS PULLED OUT")
+print("--------------------------------------------------")
 # How many variants have been pulled out 
+print("How many prioritised variants have been pulled out of BCFTOOLS using CHR and POS")
 length(unique(genotypes$chr_pos_ref_alt)) 
 # Read in the priority variant list
 pri_variants <- readr::read_lines("FEN1_priority_annot_chrposrefalt.txt")
-
+print("How many prioritised variants are there in the list")
+length(pri_variants)
 # Are there the same number variants pulled out than in the priority list 
+print("Are the number of variants pulled out by BCFTOOLS and the number of those in the list the same?")
 length(pri_variants) == length(unique(genotypes$chr_pos_ref_alt))
 
 # Pull out the extra variants which have been extracted (should have the same position as a priority variant)
-
+print("The extra variants extracted")
 unique(genotypes$chr_pos_ref_alt)[unique(genotypes$chr_pos_ref_alt) %in% pri_variants == FALSE]
 
 # Filter to just the variants in the priority variant list 
-
+print("Filtering to just the variants in the variant list")
 genotypes <- genotypes %>% filter(chr_pos_ref_alt %in% pri_variants)
 
+print("--------------------------------------------------")
+print("SUMMARISING GENOTYPE COUNTS PER PARTICIPANT AND PER VARIANT")
+print("--------------------------------------------------")
 # Find out how many participants carry a prioritised variant 
+print("The distribution of genotypes in the prioritised variants")
 table(genotypes$GT)
 # There are some . and some ./. - how to deal with these? 
 # - remove the individuals with a missing phenotype at any prioritised variant 
 # - As cannot be certain if these individuals carry the variant or not 
-
+print("Remove the missing genotypes")
 genotypes <- genotypes %>% filter(GT != "./." & GT != ".")
 
 # See how many carriers per variant
-
+print("See how many carriers each variant has and what type")
 variant_carrier_summary <- genotypes %>% group_by(chr_pos_ref_alt) %>% 
 summarise(althet_carriers = sum(GT == "0/1"),
 althom_carriers = sum(GT == "1/1"),
@@ -66,19 +80,24 @@ variant_carrier_summary <- variant_carrier_summary %>%
 separate(chr_pos_ref_alt, into = c("CHR", "POS", "REF", "ALT"), sep = "_", remove = FALSE) %>%
 mutate(POS = as.numeric(POS))
 
+print(variant_carrier_summary)
+
 var_sum_plt <- ggplot(variant_carrier_summary, aes(x = althet_carriers)) + 
 geom_histogram() + 
 labs(x = "Number of alternate heterozygous carriers per variant", y = "Number of variants", title = paste0(gene, ": prioritised variant carriers")) + 
 theme_minimal() 
 
 # How many variants carried per participant
-
+print("How many variants carried by each individual")
 participant_variant_summary <- genotypes %>% 
 group_by(SAMPLE) %>% 
 summarise(num_althet_vars = sum(GT=="0/1"),
 num_althom_vars = sum(GT=="1/1"),
 num_altref_vars = sum(GT=="0/0"))
-
+print("How many variants carried in alternate heterozygous per person")
+table(participant_variant_summary$num_althet_vars)
+print("How many variants carried in alternate homozygous per person")
+table(participant_variant_summary$num_althom_vars)
 part_var_plt <- ggplot(participant_variant_summary %>% filter(num_althet_vars !=0), 
 aes(x = as.factor(num_althet_vars), fill = as.factor(num_althet_vars))) + 
 geom_bar(stat="count")+  
@@ -87,16 +106,19 @@ theme_minimal() +
 labs(x = paste0("Number of ", gene, " prioritised variants carried per individual"), y = "Number of participants", title = paste0(gene, ": prioritised variant carriers")) +
 theme(legend.position="none")
 
+print("--------------------------------------------------")
+print("EXTRACTING THE CARRIERS AND NON-CARRIERS")
+print("--------------------------------------------------")
 # Extract the carriers 
-
+print("Extracting the carriers")
 carriers <- participant_variant_summary %>% 
 filter(num_althom_vars > 0 | num_althet_vars > 0)
-
+print(paste0("There are ", length(unique(carriers$SAMPLE)), " who carry at least one of prioritised variants in ", gene))
 # Extract non carriers
 # This excludes those who are reference homozygous in almost all variants, but have a missing genotype at one (n = 13)
 noncarriers <- participant_variant_summary %>% 
 filter(num_altref_vars == length(pri_variants))
-
+print(paste0("There are ", length(unique(noncarriers$SAMPLE)), " who do NOT carry any of prioritised variants in ", gene))
 # Pull out the samples with no alternate heterozygous variants or alternate homozygous variants
 samples_with_no_althet_vars <- participant_variant_summary %>%
     filter(num_althet_vars == 0 & num_althom_vars == 0) %>%
@@ -107,12 +129,14 @@ samples_not_in_noncarriers <- samples_with_no_althet_vars[!samples_with_no_althe
 
 # Establish how many of reference homozygous genotypes these samples have 
 # (These have less than the number of priority variants)
+print("The samples which have at least one missing genotype for a priority variant and therefore we cannot ascertain carrier status or not for sure")
+print("Removing these samples")
 participant_variant_summary %>% 
 filter(SAMPLE %in% samples_not_in_noncarriers) %>% 
 select(SAMPLE, num_altref_vars)
 
 ## Get genotype information for the carriers
-
+print("Extracting the genotype information for carriers to save")
 carriers_genotypes <- genotypes %>% 
 filter(SAMPLE %in% carriers$SAMPLE) %>% 
 group_by(SAMPLE) %>% 
@@ -123,7 +147,7 @@ hom_variants = paste(chr_pos_ref_alt[GT=="1/1"], collapse = ",")
 )
 
 # Create a  FEN1 carrier 'phenotype' for use in plotting
-
+print(paste0("Creating a variable for the ", gene, " which denotes participants which carry a variant as 1 and those who do not as 0"))
 carriers_info <- rbind(carriers_genotypes %>%
  mutate(status="carrier") %>% 
  select(SAMPLE, status),
@@ -133,12 +157,23 @@ carriers_info <- rbind(carriers_genotypes %>%
 
 # Save the carrier variant information, the carrier 'phenotype', the carrier summary and the variant summary
 
+print("--------------------------------------------------")
+print("SAVING")
+print("--------------------------------------------------")
+
+print(paste0("Saving summary of the number of variants per participant to: ", gene, "_participant_var_summary.tsv"))
+print(paste0("Saving summary of the number of carriers per variant to: ", gene, "_variant_count_summary.tsv"))
+print(paste0("Saving the carrier status file to: ", gene, "_carriers_info.tsv"))
+print(paste0("Saving the genotype information about the carriers to: ", gene, "_carriers_genotypes.tsv"))
+
 write.table(participant_variant_summary, paste0(gene, "_participant_var_summary.tsv"), sep = '\t', row.names = F, quote = F)
 write.table(variant_carrier_summary, paste0(gene, "_variant_count_summary.tsv"), sep = '\t', row.names = F, quote = F)
 write.table(carriers_info, paste0(gene, "_carrier_info.tsv"),  sep = "\t", row.names = F, quote = F)
 write.table(carriers_genotypes, paste0(gene, "_carriers_genotypes.tsv"),  sep = "\t", row.names = F, quote =F)
 
 # Save the graphs 
+print(paste0("Graph summarising the number of variants per participants saved to : ", gene, "_pri_carriers_summary.png"))
+print(paste0("Graph summarising the number of participants per variant saved to: ", gene, "_pri_variant_summary.png"))
 
 ggsave(filename = paste0(gene, "_pri_carriers_summary.png"), part_var_plt, width = 10, height = 6, device = "png", dpi = 300)
 ggsave(filename = paste0(gene, "_pri_variant_summary.png"), var_sum_plt, width = 10, height = 6, device = "png", dpi = 300)
