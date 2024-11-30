@@ -9,6 +9,22 @@
 if (!requireNamespace("optparse", quietly = TRUE)) {
   install.packages("optparse")
 }
+if (!requireNamespace("data.table", quietly = TRUE)) {
+  install.packages("data.table")
+}
+if (!requireNamespace("dplyr", quietly = TRUE)) {
+  install.packages("dplyr")
+}
+if (!requireNamespace("readr", quietly = TRUE)) {
+  install.packages("readr")
+}
+if (!requireNamespace("tidyr", quietly = TRUE)) {
+  install.packages("tidyr")
+}
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  install.packages("ggplot2")
+}
+
 library(data.table)
 library(dplyr)
 library(readr)
@@ -18,11 +34,13 @@ library(optparse)
 
 parser <- OptionParser()
 parser <- add_option(parser, c('-g','--gene'), type = 'character', help = 'Gene looking at', metavar = "GENE")
+parser <- add_option(parser, c('-g','--extra'), type = 'character', help = 'Are there extra genotypes pulled out', metavar = "EXTRA")
 
 opt=parse_args(parser)
 print(opt)
 
 gene = opt$gene
+extra = opt$extra
 sink(paste0(gene, "_summarise_carriers.log"))
 print("--------------------------------------------------")
 print("READING IN DATA")
@@ -33,6 +51,13 @@ fads_genes <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t" , header = T)
 # The genotypes of the prioritised variants 
 genotypes <- fread(paste0(gene, "_priority_genotypes.tsv"), sep = "\t", header = F)
 colnames(genotypes) <- c("CHR", "POS", "REF", "ALT", "SAMPLE", "GT")
+# If there are extra genotypes pulled out due to the canonical issue for the gene
+# Read these in and bind the genotypes together
+if(extra =="Yes"){
+    extra_genotypes <- fread(paste0(gene, "_extra_priority_genotypes.tsv"), sep = "\t", header =F)
+    colnames(extra_genotypes) <- colnames(genotypes)
+    genotypes <- rbind(genotypes, extra_genotypes)
+}
 genotypes <- genotypes %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT))
 
 print("--------------------------------------------------")
@@ -42,20 +67,32 @@ print("--------------------------------------------------")
 print("How many prioritised variants have been pulled out of BCFTOOLS using CHR and POS")
 length(unique(genotypes$chr_pos_ref_alt)) 
 # Read in the priority variant list
-pri_variants <- readr::read_lines("FEN1_priority_annot_chrposrefalt.txt")
+pri_variants <- readr::read_lines(paste0(gene, "_priority_annot_chrposrefalt.txt"))
 print("How many prioritised variants are there in the list")
 length(pri_variants)
+pri_variants_df <- data.frame(chr_pos_ref_alt = pri_variants) %>% 
+separate(chr_pos_ref_alt, into = c("CHR", "POS", "REF", "ALT"), sep = "_", remove = FALSE)
 # Are there the same number variants pulled out than in the priority list 
 print("Are the number of variants pulled out by BCFTOOLS and the number of those in the list the same?")
 length(pri_variants) == length(unique(genotypes$chr_pos_ref_alt))
 
 # Pull out the extra variants which have been extracted (should have the same position as a priority variant)
 print("The extra variants extracted")
-unique(genotypes$chr_pos_ref_alt)[unique(genotypes$chr_pos_ref_alt) %in% pri_variants == FALSE]
-
+extra_variants_bcftools <- genotypes %>% filter(chr_pos_ref_alt %in% pri_variants == FALSE) %>%
+distinct(chr_pos_ref_alt, .keep_all = TRUE)
+table(extra_variants_bcftools$POS %in% pri_variants_df$POS)
 # Filter to just the variants in the priority variant list 
+# There are some priority variants (3) which are not pulled out by the BCFTools command?
+# But they must exist (?) 
 print("Filtering to just the variants in the variant list")
 genotypes <- genotypes %>% filter(chr_pos_ref_alt %in% pri_variants)
+# Check if there are some variants missing 
+print("Priority variants that are not pulled out in the bcftools view")
+pri_variants_df %>% filter(chr_pos_ref_alt %in% genotypes$chr_pos_ref_alt)
+# get list of the priority variants which are not being pulled out 
+pri_variants_df %>% filter(chr_pos_ref_alt %in% genotypes$chr_pos_ref_alt == FALSE)
+
+
 
 print("--------------------------------------------------")
 print("SUMMARISING GENOTYPE COUNTS PER PARTICIPANT AND PER VARIANT")
@@ -155,6 +192,33 @@ carriers_info <- rbind(carriers_genotypes %>%
  mutate(status = "non-carrier") %>% 
  select(SAMPLE, status))
 
+table(carriers_info$status)
+# Establish per variant information 
+
+# Establish the compound heterozygous variants 
+poten_comp_het_variants <- carriers_genotypes %>% 
+filter(n_het_variants > 1 & n_althom_variants == 0 ) %>% 
+pull(het_variants) %>% strsplit(., ':') %>%
+unlist() %>% 
+unique()
+
+variant_carrier_summary <- variant_carrier_summary %>% 
+mutate(zygosity = case_when(chr_pos_ref_alt %in% poten_comp_het_variants ~ "Inconc_comp_het",
+althet_carriers > 0 & althom_carriers > 0 ~ "Alt_hom_and_alt_het",
+althet_carriers > 0 & althom_carriers ==0 ~ "Alt-het",
+althet_carriers == 0 & althom_carriers > 0 ~ "Alt-hom",
+TRUE ~ "No valid zygosity"))
+
+variant <- variant_carrier_summary %>% mutate(colour_for_lolliplot = 
+case_when(zygosity == "Alt-het" ~ "#90EE90",
+zygosity == "Alt_hom_and_alt_het" ~ "#006400", 
+zygosity == "Alt-hom" ~ "#ADD8E6",
+zygosity == "Inconc_comp_het" ~  "lightpink",
+TRUE ~ "No valid zygosity"))
+
+variant_info <- variant %>% 
+select(c(chr_pos_ref_alt, CHR, POS, REF, ALT, zygosity, colour_for_lolliplot, althet_carriers))
+
 # Save the carrier variant information, the carrier 'phenotype', the carrier summary and the variant summary
 
 print("--------------------------------------------------")
@@ -165,11 +229,13 @@ print(paste0("Saving summary of the number of variants per participant to: ", ge
 print(paste0("Saving summary of the number of carriers per variant to: ", gene, "_variant_count_summary.tsv"))
 print(paste0("Saving the carrier status file to: ", gene, "_carriers_info.tsv"))
 print(paste0("Saving the genotype information about the carriers to: ", gene, "_carriers_genotypes.tsv"))
+print(paste0("Saving per variant information about zygosity to: ", gene, "_variant_zygosity.tsv"))
 
 write.table(participant_variant_summary, paste0(gene, "_participant_var_summary.tsv"), sep = '\t', row.names = F, quote = F)
 write.table(variant_carrier_summary, paste0(gene, "_variant_count_summary.tsv"), sep = '\t', row.names = F, quote = F)
 write.table(carriers_info, paste0(gene, "_carrier_info.tsv"),  sep = "\t", row.names = F, quote = F)
 write.table(carriers_genotypes, paste0(gene, "_carriers_genotypes.tsv"),  sep = "\t", row.names = F, quote =F)
+write.table(variant_info, paste0(gene, "_variant_zygosity.tsv"), sep = "\t", row.names = F, quote = F)
 
 # Save the graphs 
 print(paste0("Graph summarising the number of variants per participants saved to : ", gene, "_pri_carriers_summary.png"))
