@@ -65,7 +65,7 @@ print("How many variant annotations back from VEP")
 length(unique(vep_output$chr_pos_ref_alt))
 print("Filtering to the canonical transcript")
 # Filter to the canonical transcript
-vep_output_canonical <- vep_output %>% filter(CANONICAL == "YES")
+vep_output_canonical <- vep_output %>% filter(CANONICAL == "YES" & SYMBOL == gene)
 length(unique(vep_output_canonical$chr_pos_ref_alt))
 # For variants with multiple consequences, filter to the most severe 
 print("If multiple consequences per variant, filtering to the most severe")
