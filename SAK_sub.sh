@@ -317,3 +317,27 @@ query_pri_genotypes="bash extract_pri_genotypes.sh FADS3"
  --instance-type "mem1_ssd1_v2_x4" \
  --destination="/Output/" \
  --brief --yes
+
+ query_extra_pri_genotypes="bash extra_genotypes_extract.sh TMEM258"
+  dx run swiss-army-knife \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/TMEM258_priority_annot_chrpos.tsv" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/TMEM258_varqc_sampqc_HWE_combined.vcf.gz" \
+  -iin="/Code/extra_genotypes_extract.sh" \
+  -icmd="${query_extra_pri_genotypes}" \
+ --tag="Extract_extra_TMEM258_priority_genotypes" \
+ --instance-type "mem1_ssd1_v2_x4" \
+ --destination="/Output/genotypes/" \
+ --brief --yes
+
+
+ summarise_genotypes="Rscript priority_carriers_counts.R --gene FADS1"
+   dx run swiss-army-knife \
+  -iin="/Code/priority_carriers_counts.R" \
+  -iin="/Input/FADS_cluster_UKB_pVCF.tsv" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/FADS1_priority_annot_chrposrefalt.txt" \
+  -iin="/Output/genotypes/FADS1_priority_genotypes.tsv" \
+  -icmd="${summarise_genotypes}" \
+ --tag="Summarise_FADS1_genotypes" \
+ --instance-type "mem1_ssd1_v2_x4" \
+ --destination="/Output/genotypes/genotype_summary/" \
+ --brief --yes
