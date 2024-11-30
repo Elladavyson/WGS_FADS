@@ -19,5 +19,5 @@ separate(chr_pos_ref_alt, into = c("CHR", "POS", "REF", "ALT"), sep = "_", remov
 # If there are missing priority variants, save their CHR and POS to extract the genotypes and then append them onto the genotypes file
 missed_pri_variants <- pri_variants_df %>% filter(POS %in% chrpos_file$POS==FALSE)
 if(nrow(missed_pri_variants) > 0) {
-    write.table(missed_pri_variants %>% select(CHR,POS), paste0(gene, "_extra_pri_genotypes.tsv"), sep = "\t", row.names = F, col.names = F, quote = F)
+    write.table(missed_pri_variants %>% select(CHR,POS), paste0(gene, "_extra_pri_chrpos.tsv"), sep = "\t", row.names = F, col.names = F, quote = F)
 }
