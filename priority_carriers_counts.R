@@ -2,7 +2,8 @@
 # Example with FEN1
 
 # dx download /Output/genotypes/FEN1_priority_genotypes.tsv
-# dx download /Output/gene_VCF_variants/variants/pri_variants/FEN1_priority_annot_chrposrefalt.txt
+# dx download /Output/genotypes/FEN1_extra_priority_genotypes.tsv
+# dx download /Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/FEN1_priority_annot_chrposrefalt.txt
 # dx download /Input/FADS_cluster_UKB_pVCF.tsv
 
 ### Read in the libraries
@@ -34,7 +35,7 @@ library(optparse)
 
 parser <- OptionParser()
 parser <- add_option(parser, c('-g','--gene'), type = 'character', help = 'Gene looking at', metavar = "GENE")
-parser <- add_option(parser, c('-g','--extra'), type = 'character', help = 'Are there extra genotypes pulled out', metavar = "EXTRA")
+parser <- add_option(parser, c('-e','--extra'), type = 'character', help = 'Are there extra genotypes pulled out', metavar = "EXTRA")
 
 opt=parse_args(parser)
 print(opt)
@@ -51,14 +52,18 @@ fads_genes <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t" , header = T)
 # The genotypes of the prioritised variants 
 genotypes <- fread(paste0(gene, "_priority_genotypes.tsv"), sep = "\t", header = F)
 colnames(genotypes) <- c("CHR", "POS", "REF", "ALT", "SAMPLE", "GT")
+genotypes <- genotypes %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT))
 # If there are extra genotypes pulled out due to the canonical issue for the gene
 # Read these in and bind the genotypes together
 if(extra =="Yes"){
+    print("Appending the exta genotypes")
     extra_genotypes <- fread(paste0(gene, "_extra_priority_genotypes.tsv"), sep = "\t", header =F)
-    colnames(extra_genotypes) <- colnames(genotypes)
+    # Make sure the extra genotypes ARE extra (not creating any duplications)
+    colnames(extra_genotypes) <- c("CHR", "POS", "REF", "ALT", "SAMPLE", "GT")
+    extra_genotypes <- extra_genotypes %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT))
+    extra_genotypes <- extra_genotypes %>% filter(chr_pos_ref_alt %in% unique(genotypes$chr_pos_ref_alt) == FALSE)
     genotypes <- rbind(genotypes, extra_genotypes)
 }
-genotypes <- genotypes %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT))
 
 print("--------------------------------------------------")
 print("CHECKING VARIANTS PULLED OUT")
@@ -82,17 +87,14 @@ extra_variants_bcftools <- genotypes %>% filter(chr_pos_ref_alt %in% pri_variant
 distinct(chr_pos_ref_alt, .keep_all = TRUE)
 table(extra_variants_bcftools$POS %in% pri_variants_df$POS)
 # Filter to just the variants in the priority variant list 
-# There are some priority variants (3) which are not pulled out by the BCFTools command?
-# But they must exist (?) 
 print("Filtering to just the variants in the variant list")
 genotypes <- genotypes %>% filter(chr_pos_ref_alt %in% pri_variants)
-# Check if there are some variants missing 
-print("Priority variants that are not pulled out in the bcftools view")
-pri_variants_df %>% filter(chr_pos_ref_alt %in% genotypes$chr_pos_ref_alt)
-# get list of the priority variants which are not being pulled out 
-pri_variants_df %>% filter(chr_pos_ref_alt %in% genotypes$chr_pos_ref_alt == FALSE)
-
-
+# Check that all the priority variants are present 
+if(table(pri_variants %in% genotypes$chr_pos_ref_alt)==FALSE) {
+    stop("Not all priority variants pulled out, investigate")
+} else {
+    print('All priority variants pulled out')
+}
 
 print("--------------------------------------------------")
 print("SUMMARISING GENOTYPE COUNTS PER PARTICIPANT AND PER VARIANT")
