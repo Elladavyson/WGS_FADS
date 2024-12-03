@@ -1,15 +1,17 @@
 library(data.table)
 library(dplyr)
-library(bestNormalize)
-library(ukbnmr)
+library(bestNormalize) # Have to install
+library(ukbnmr) # Have to install
 library(purrr)
 library(rlang)
 library(tidyr)
 library(ggplot2)
-library(Hmisc)
-library(ggpubr)
+library(Hmisc) # Have to install
+library(ggpubr) # Have to install 
+library(ggsignif) # Have to install 
 
 # dx download /Output/genotypes/genotype_summary/*_carrier_info.tsv
+# dx download /Input/FADS_cluster_UKB_pVCF.tsv
 # dx download /Input/MajorDepression.ukb24262.2021-07.txt
 # dx download data_participant_all.csv
 # dx download data_participant_metabolomics.csv
@@ -159,7 +161,24 @@ extract_chi_res <- function(chi_res, gene) {
 chi_results_all <- rbind(extract_chi_res(FEN1_chires, "FEN1"), extract_chi_res(FADS1_chires, "FADS1"), extract_chi_res(FADS2_chires, "FADS2"),
 extract_chi_res(FADS3_chires, "FADS3"), extract_chi_res(MYRF_chires, "MYRF"), extract_chi_res(TMEM258_chires, "TMEM258"))
 
+chi_res_list <- list(FEN1_chires, FADS1_chires, FADS2_chires, FADS3_chires, MYRF_chires, TMEM258_chires)
+extract_chi_values <- function(chi_res, gene){
+    observed <- chi_res$observed
+    expected <- chi_res$expected
+    chi_values_df <- data.frame(gene = gene,
+    MDD_status=rownames(observed),
+    Carrier_status= c(rep("Carrier",2 ), rep("Non-carrier",2)),
+    observed = as.vector(observed),
+    expected = as.vector(expected))
+    return(chi_values_df)
+}
+chi_values_list <- mapply(extract_chi_values, chi_res_list, genes, SIMPLIFY = FALSE)
+combined_chi_values <- rbindlist(chi_values_list)
+
 write.table(chi_results_all, "all_carriers_mdd_chisq_results.tsv", sep = "\t", row.names =F, quote = F)
+write.table(combined_chi_values, "all_carriers_mdd_chisq_exp_obs.tsv", sep = "\t", row.names = F, quote = F)
+
+###############################################################################
 
 # Summary of the carriers vs non carriers in baseline demographic variables 
 # In those with metabolomic data at instance 0 
@@ -347,11 +366,45 @@ lapply(genes, function(gene) {
     assign(paste0(gene, "_metacarrier_summary"),carrier_summary)
 })
 
+###########################################################################
+
+# Statistically test the differences in metabolite distributions between carriers and non carriers of FADS prioritised variants
+
+###########################################################################
+metabolites <- colnames(norm_metabolite_baseline %>% select(ends_with(".0.0")))
+run_t_test <- function(metabolite, gene, data) {
+    gene_status <- paste0(gene, "_status")
+    ttest_result <- t.test(data[[metabolite]]~ data[[gene_status]], data = data)
+    result <- data.frame(
+        metabolite= get_metabolitename(metabolite),
+        gene=gene,
+        t_statistic=ttest_result$statistic,
+        df=ttest_result$parameter,
+        conf_int_lower=ttest_result$conf.int[1],
+        conf_int_upper=ttest_result$conf.int[2],
+        mean_diff=ttest_result$estimate[1] - ttest_result$estimate[2],
+        p_value=ttest_result$p.value
+    )
+    return(result)
+}
+ttest_results <- list()
+for (metabolite in metabolites) {
+    for (gene in genes) {
+        ttest_results[[paste(metabolite, gene, sep = "_")]] <- run_t_test(metabolite, gene, norm_metabolite_baseline)
+    }
+}
+ttest_results_df <- do.call(rbind, ttest_results)
+ttest_results_df$pval_BH <- p.adjust(ttest_results_df$p_value, method = "BH")
+ttest_results_df <- ttest_results_df %>% arrange(pval_BH)
+
 
 data_summary <- function(x) {
+  n <- length(x)  
   m <- mean(x)
-  ymin <- m -sd(x)
-  ymax <- m + sd(x)
+  sd_val <- sd(x)
+  ci_margin <- 1.96*(sd_val/sqrt(n))
+  ymin <- m -ci_margin
+  ymax <- m + ci_margin
   return(c(y=m, ymin = ymin, ymax = ymax))
 }
 
@@ -361,6 +414,12 @@ violin_meta_dists <- function(gene, metabolite) {
         filter(!is.na(!!sym(paste0(gene, "_status")))) %>%
         mutate(!!paste0(gene, "_status") := factor(!!sym(paste0(gene, "_status")), levels = c("carrier", "non-carrier")))
     
+    # Get the relevant ttest result
+    metabolitename <- get_metabolitename(metabolite)
+    genename = gene
+    ttest_res <- ttest_results_df %>% filter(metabolite == metabolitename & gene == genename)
+    ttest_p <- ttest_res$p_value
+    ttest_plabel <- ifelse(ttest_res$pval_BH < 0.05, paste0("p = ", formatC(ttest_p, format = "e", digits = 2) %>% as.character()), "NS")
     plt <- ggplot(norm_metabolite, aes(x = as.factor(!!sym(paste0(gene, "_status"))), 
                                        y = !!sym(metabolite),
                                        color = as.factor(!!sym(paste0(gene, "_status"))), 
@@ -377,7 +436,12 @@ violin_meta_dists <- function(gene, metabolite) {
              y = 'Normalised measure') + 
         scale_x_discrete(labels = c("Carrier", "Non-carrier")) +
         theme(legend.position = "none", 
-              text = element_text(size = 15)) 
+              text = element_text(size = 12)) +
+
+              geom_signif(comparisons = list(c("carrier", "non-carrier")),
+              map_signif_level = TRUE,
+              annotations=ttest_plabel,
+              tip_length = 0.03, color = "black")
 
     return(plt)
 }
@@ -400,13 +464,4 @@ lapply(genes, function(gene) {
          plot = annotate_figure(arranged_plot, top = text_grob(paste0(gene, ": All prioritised variants"), size = 14, face = "bold")),
          width = 8, height = 10, device = "png", dpi = 300)
 })
-
-###########################################################################
-
-# Statistically test the differences in metabolite distributions between carriers and non carriers of FADS prioritised variants
-
-###########################################################################
-
-t.test(f.23443.0.0 ~ FEN1_status, data = norm_metabolite_baseline)
-t.test(f.23444.0.0 ~ FEN1_status, data = norm_metabolite_baseline)
 
