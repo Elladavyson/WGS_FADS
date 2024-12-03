@@ -10,7 +10,8 @@ library(Hmisc) # Have to install
 library(ggpubr) # Have to install 
 library(ggsignif) # Have to install 
 
-# dx download /Output/genotypes/genotype_summary/*_carrier_info.tsv
+# dx download /Output/genotypes/genotype_summary/all_priority/*_carrier_info.tsv
+# dx download /Output/genotypes/genotype_summary/all_priority/*_participant_var_summary.tsv
 # dx download /Input/FADS_cluster_UKB_pVCF.tsv
 # dx download /Input/MajorDepression.ukb24262.2021-07.txt
 # dx download data_participant_all.csv
@@ -27,7 +28,11 @@ for (i in 1:nrow(fads_genes)){
     gene <- fads_genes$hgnc_symbol[i]
     gene_carrier <- read.table(paste0(gene, "_carrier_info.tsv"), sep = "\t", header = T)
     colnames(gene_carrier) <- c("SAMPLE", paste0(gene, "_status"))
+    zygosity <- fread(paste0(gene, "_variant_zygosity.tsv"), sep = "\t") %>% as.data.frame()
+    participant_summary <- fread(paste0(gene, "_participant_var_summary.tsv"), sep="\t") %>% as.data.frame()
     assign(paste0(gene, "_carriers"), gene_carrier)
+    assign(paste0(gene, "_variants"), zygosity)
+    assign(paste0(gene, "_part_summary"), participant_summary)
 }
 print("Reading in MDD phenotype")
 mdd <- read.table("MajorDepression.ukb24262.2021-07.txt", header = T)
@@ -36,6 +41,62 @@ print("Reading in cohort data")
 all <- read.csv("data_participant_all.csv")
 # colnames "eid" "p31"  "p34" "p22189" "p54_i0" "p21000_i0" "p21003_i0" "p21001_i0" "p20116_i0" "p6138_i0"  "p23449_i0" "p23444_i0" "p23450_i0" "p23457_i0" "p23459_i0" "p23443_i0"
 colnames(all) <- c("f.eid", "Sex", "yob", "TDI", "AC", "ethnicity", "Age","BMI", "smoking_stat", "qualifications", "f.23449.0.0", "f.23444.0.0", "f.23450.0.0", "f.23457.0.0", "f.23459.0.0", "f.23443.0.0")
+
+###################################################################################
+
+# Number of prioritised variants and carriers per gene 
+
+###################################################################################
+
+carriers_split <- function(df, gene) {
+    df <- df %>% rename("status"= paste0(gene, "_status")) %>% 
+    mutate(GENE = gene)
+    return(df)
+}
+
+part_summary <- function(df, gene) {
+    df <- df %>% 
+    mutate(carrier_type = case_when(num_althet_vars == 0 & num_althom_vars == 0 ~ "Non-carrier",
+    num_althet_vars == 1 & num_althom_vars == 0 ~ "Alternate heterozgyous",
+    num_althet_vars > 1 & num_althom_vars == 0 ~ "Compound heterozygous",
+    num_althet_vars == 0 & num_althom_vars > 0 ~ "Alternate homozygous",
+    num_althet_vars > 0 & num_althom_vars > 0 ~ "Alternate heterozygous & alternate homozygous"))
+    df <- df %>% mutate(GENE = gene)
+    return(df)
+}
+
+gene_carriers_list <- list(carriers_split(FADS1_carriers, "FADS1"), carriers_split(FADS2_carriers, "FADS2"), carriers_split(FADS3_carriers, "FADS3"), carriers_split(FEN1_carriers, "FEN1"),
+ carriers_split(MYRF_carriers, "MYRF"), carriers_split(TMEM258_carriers, "TMEM258"))
+ part_summary_list <- list(part_summary(FADS1_part_summary ,"FADS1"), part_summary(FADS2_part_summary,"FADS2"),
+ part_summary(FADS3_part_summary, "FADS3"), part_summary(FEN1_part_summary, "FEN1"), part_summary(MYRF_part_summary, "MYRF"),
+ part_summary(TMEM258_part_summary, "TMEM258"))
+variant_zygosity_list <- list(FADS1_variants, FADS2_variants, FADS3_variants, FEN1_variants, MYRF_variants, TMEM258_variants)
+
+gene_carriers_all <- do.call(rbind, gene_carriers_list)
+part_summary_all <- do.call(rbind, part_summary_list)
+variant_zy_all <- do.call(rbind, variant_zygosity_list)
+
+carrier_types_plt <- ggplot(part_summary_all %>% 
+filter(carrier_type != "Non-carrier"), aes(x = GENE, fill = carrier_type))+ 
+geom_bar(stat="Count", position = "dodge") + 
+geom_text(stat = "count", aes(label = after_stat(count), color = carrier_type), position = position_dodge(width = 0.8), vjust = -0.5, size = 3, show.legend = FALSE) +
+theme_minimal() + 
+labs(x = "Gene", y = "Count", fill = "Carrier type") + guides(color= guide_legend(label = FALSE))
+
+carrier_numbers_plt <- ggplot(gene_carriers_all, aes(x= "status", fill=status)) + 
+geom_bar(stat="count", position = "dodge") + 
+geom_text(stat = "count", aes(label = after_stat(count), color = status), position = position_dodge(width = 0.8), vjust = -0.5, size = 3, show.legend = FALSE) +
+theme_minimal() + 
+labs(x = "", y = "Count", fill = "") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
+
+#### Are there some people who carry a prioritised variant in more than one gene? 
+
+gene_carriers_all %>% 
+group_by(SAMPLE) %>% 
+summarise(numgenes_carriers=sum(status=='carrier')) %>% pull(numgenes_carriers) %>% table() 
+
+ggsave(filename ="carrier_types_genes_all.png", carrier_types_plt, width = 10, height = 6, device = "png", dpi = 300)
+ggsave(filename= "carrier_numbers_all.png", carrier_numbers_plt,width = 8, height = 10, device = "png", dpi = 300) 
 
 ###############################################################################
  
@@ -64,7 +125,7 @@ all <- left_join(all, mdd, c("f.eid"= "IID"))
 
 ################################################################################
 # Left join all the carrier status' to the demographic information
-gene_carriers_list <- list(FADS1_carriers, FADS2_carriers, FADS3_carriers, FEN1_carriers, MYRF_carriers, TMEM258_carriers)
+
 all <- reduce(gene_carriers_list, function(x,y){
     left_join(x,y, by = c("f.eid"="SAMPLE"))
 }, .init = all)
@@ -397,14 +458,18 @@ ttest_results_df <- do.call(rbind, ttest_results)
 ttest_results_df$pval_BH <- p.adjust(ttest_results_df$p_value, method = "BH")
 ttest_results_df <- ttest_results_df %>% arrange(pval_BH)
 
+write.table(ttest_results_df, "ttest_metabolite_carrier_all_results.tsv", sep = "\t", row.names = F, quote = F)
+
+###################################################################################
+
+# Plotting the distribution of metabolomic data per carriers and non carriers 
+
+################################################################################### 
 
 data_summary <- function(x) {
-  n <- length(x)  
   m <- mean(x)
-  sd_val <- sd(x)
-  ci_margin <- 1.96*(sd_val/sqrt(n))
-  ymin <- m -ci_margin
-  ymax <- m + ci_margin
+ymin <- m - sd(x)
+ymax <- m+sd(x)
   return(c(y=m, ymin = ymin, ymax = ymax))
 }
 
@@ -419,7 +484,7 @@ violin_meta_dists <- function(gene, metabolite) {
     genename = gene
     ttest_res <- ttest_results_df %>% filter(metabolite == metabolitename & gene == genename)
     ttest_p <- ttest_res$p_value
-    ttest_plabel <- ifelse(ttest_res$pval_BH < 0.05, paste0("p = ", formatC(ttest_p, format = "e", digits = 2) %>% as.character()), "NS")
+    ttest_plabel <- paste0("p = ", formatC(ttest_p, format = "e", digits = 2) %>% as.character())
     plt <- ggplot(norm_metabolite, aes(x = as.factor(!!sym(paste0(gene, "_status"))), 
                                        y = !!sym(metabolite),
                                        color = as.factor(!!sym(paste0(gene, "_status"))), 
@@ -436,12 +501,13 @@ violin_meta_dists <- function(gene, metabolite) {
              y = 'Normalised measure') + 
         scale_x_discrete(labels = c("Carrier", "Non-carrier")) +
         theme(legend.position = "none", 
-              text = element_text(size = 12)) +
+              text = element_text(size = 9)) +
 
               geom_signif(comparisons = list(c("carrier", "non-carrier")),
               map_signif_level = TRUE,
               annotations=ttest_plabel,
-              tip_length = 0.03, color = "black")
+              tip_length = 0.03, color = "black",
+              vjust = 2)
 
     return(plt)
 }
