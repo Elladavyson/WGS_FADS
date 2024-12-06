@@ -60,3 +60,34 @@ bcftools view -H ukb24310_c11_b3080_v1.vcf.gz | view
 # Uploading any files back to work project
 
 dx upload --path "$DX_PROJECT_CONTEXT_ID:" file 
+
+### Cohort browswer
+
+# Create a cohort using the filtering metrics and add the columns you want (unsure how you can do this programmatically)
+# Then convert to a csv file using the Table exporter tool
+
+### Lifting over all the genotype array data to GRCh38 (from GRCh37) - not certain if neccessary for regenie
+### Mark wasn't sure it was but all the tutorials about the analysis of WES say that it is 
+
+# download the workflow from Github: 
+https://github.com/dnanexus-rnd/liftover_plink_beds/blob/main/liftover_plink_beds.wdl
+#download java locally: 
+brew install openjdk
+#download the latest JAR compiler:
+https://github.com/dnanexus/dxCompiler/releases
+# Login 
+dx login 
+# Compile the workflow
+java -jar Downloads/dxCompiler-2.11.9.jar compile Downloads/liftover_plink_beds.wdl -project WGS_AVT -folder /Output/
+
+# Run the workflow with the following inputs 
+
+plink_beds: /Bulk/Genotype Results/Genotype calls/*.bed (22 files)
+
+plink_bims: /Bulk/Genotype Results/Genotype calls/*.bim (22 files)
+
+plink_fams: /Bulk/Genotype Results/Genotype calls/*.fam (22 files)
+
+reference_fastagz: /Bulk/Exome sequences/Exome OQFE CRAM files/helper_files/GRCh38_full_analysis_set_plus_decoy_hla.fa
+# Chain file downloaded from the UCSC server
+ucsc_chain: hg19ToHg38.over.chain.gz 
