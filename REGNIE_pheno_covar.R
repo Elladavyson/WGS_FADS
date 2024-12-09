@@ -151,7 +151,7 @@ rename("IID"="f.eid") %>%
 select(FID, IID, everything())
 lapply(covars %>% select(-c(FID, IID, starts_with("PC"))), function(column) table(column, useNA="always"))
 
-write.table(metabol_pheno, "ukb_unrel_eur_covars.covar", sep = "\t", row.names = F, quote=F)
+write.table(covars, "ukb_unrel_eur_covars.covar", sep = "\t", row.names = F, quote=F)
 
 # dx upload ukb_unrel_eur_covars.covar
 # dx upload ukb_unrel_eur_pgc3_mdd.pheno
