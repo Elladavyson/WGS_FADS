@@ -3,17 +3,18 @@ library(data.table)
 library(dplyr)
 library(bestNormalize) # Have to install
 library(ukbnmr) # Have to install
+library(readr) # Have to install
 library(purrr)
 library(rlang)
 library(tidyr)
 library(ggplot2)
 
-# dx download /Input/MajorDepression.ukb24262.2021-07.txt
-# dx download /Input/ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenScot_v2.id
-# dx download data_participant_all.csv
-# dx download data_participant_metabolomics.csv
-# dx download /Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3087_v1_norm.vcf.gz
-
+# dx download /Input/MajorDepression.ukb24262.2021-07.txt (PGC MDD3 phenotype)
+# dx download /Input/ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenScot_v2.id (list of unrelated individuals of european ancestry)
+# dx download data_participant_all.csv (data cohort all participants)
+# dx download data_participant_metabolomics.csv (data cohort participants with baseline metabolomic data)
+# dx download /Output/gene_VCF_variants/normalised_vcf/ukb24310_c11_b3087_v1_norm.vcf.gz (a pVCF of WGS data)
+# dx download sample_names.txt (samples in a WGS data file)
 print("Reading in MDD phenotype")
 mdd <- read.table("MajorDepression.ukb24262.2021-07.txt", header = T)
 print("Reading in cohort data")
@@ -36,15 +37,16 @@ colnames(all) <- c("f.eid", "Sex", "yob", "TDI", "AC", "ethnicity", "Age","BMI",
 print(paste("Transforming the sex variable to Female = 0 and Male = 1",
 "Transforming the qualifications variable into University = 1 and no University = 0",
 "Collapsing the ethnicity categories into White background = 0, Mixed background = 1 and Other = 2",
-"Collapsing the genotype arrray to binary array based on batch numbers", collapse = '\n'))
+"Collapsing the genotype arrray to binary array based on batch numbers",
+"Transforming the genotype array variable to BiLEVE = 1 and Axiom = 0", collapse = '\n'))
 
 
 all <- all %>% 
   mutate(sex_coded = ifelse(Sex == "Female", 0, 1), 
          uni_nouni = ifelse(qualifications == 'College or University degree', 1, 0),
-         genotype_array = case_when(grepl("BiLEVE", genotyping_array_batch) ~ "BiLEVE", 
-         grepl("Batch", genotyping_array_batch) ~ "Axiom",
-         TRUE ~ "NA"),
+         genotype_array = case_when(grepl("BiLEVE", genotyping_array_batch) ~ 1, 
+         grepl("Batch", genotyping_array_batch) ~ 0,
+         TRUE ~ NA_real_),
          ethnicity_collapsed = case_when(
            ethnicity %in% c('White', 'British','Irish','Any other white background') ~ 0, 
            ethnicity %in% c('Asian or Asian British', 'White and Black African', 'Any other mixed background', 'Mixed' , 'Black or Black British' , 'White and Black Caribbean', 'White and Asian') ~ 1,
@@ -127,6 +129,7 @@ rename("IID"="f.eid") %>%
 select(FID, IID, MajDepr)
 # replace all missing values (coded as -9) with NA 
 mdd_pheno$MajDepr[mdd_pheno$MajDepr == -9] <- NA
+mdd_pheno$MajDepr <- mdd_pheno$MajDepr -1 
 lapply(mdd_pheno %>% select(-c(FID, IID)), function(column) table(column, useNA="always"))
 
 metabol_pheno <- all_unrelated_wgs %>% 
@@ -149,6 +152,11 @@ covars <- all_unrelated_wgs %>%
 select(f.eid, FID, Age, sex_coded, genotype_array, AC, spectrometer, PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8, PC9, PC10) %>% 
 rename("IID"="f.eid") %>% 
 select(FID, IID, everything())
+
+covars <- covars %>% 
+mutate(spectrometer = as.numeric(factor(spectrometer)),
+AC = as.numeric(factor(AC))
+)
 lapply(covars %>% select(-c(FID, IID, starts_with("PC"))), function(column) table(column, useNA="always"))
 
 write.table(covars, "ukb_unrel_eur_covars.covar", sep = "\t", row.names = F, quote=F)
