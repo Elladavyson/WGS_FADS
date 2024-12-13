@@ -320,24 +320,183 @@ query_pri_genotypes="bash extract_pri_genotypes.sh FADS3"
 
  query_extra_pri_genotypes="bash extra_genotypes_extract.sh TMEM258"
   dx run swiss-army-knife \
-  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/TMEM258_priority_annot_chrpos.tsv" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/TMEM258_extra_pri_chrpos.tsv" \
   -iin="/Output/gene_VCF_variants/gene_vcfs/QC/TMEM258_varqc_sampqc_HWE_combined.vcf.gz" \
   -iin="/Code/extra_genotypes_extract.sh" \
   -icmd="${query_extra_pri_genotypes}" \
  --tag="Extract_extra_TMEM258_priority_genotypes" \
- --instance-type "mem1_ssd1_v2_x4" \
+ --instance-type "mem1_ssd1_v2_x8" \
  --destination="/Output/genotypes/" \
  --brief --yes
 
 
- summarise_genotypes="Rscript priority_carriers_counts.R --gene FADS1"
+ summarise_genotypes="Rscript priority_carriers_counts.R --gene FADS3 --extra Yes"
    dx run swiss-army-knife \
   -iin="/Code/priority_carriers_counts.R" \
   -iin="/Input/FADS_cluster_UKB_pVCF.tsv" \
-  -iin="/Output/gene_VCF_variants/variants/pri_variants/FADS1_priority_annot_chrposrefalt.txt" \
-  -iin="/Output/genotypes/FADS1_priority_genotypes.tsv" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/FADS3_priority_annot_chrposrefalt.txt" \
+  -iin="/Output/genotypes/FADS3_priority_genotypes.tsv" \
+  -iin="/Output/genotypes/FADS3_extra_priority_genotypes.tsv" \
   -icmd="${summarise_genotypes}" \
- --tag="Summarise_FADS1_genotypes" \
- --instance-type "mem1_ssd1_v2_x4" \
+ --tag="Summarise_FADS3_genotypes" \
+ --instance-type "mem1_ssd1_v2_x16" \
  --destination="/Output/genotypes/genotype_summary/" \
  --brief --yes
+
+ merge_genotype_files="cp /mnt/project/Bulk/Genotype\ Results/Genotype\ calls/ukb22418_c[1-9]* .;\
+ls *.bed | sed -e 's/.bed//g'> files_to_merge.txt;\
+plink --merge-list files_to_merge.txt --make-bed \
+--autosome-xy --out ukb22418_c1_22_v2_merged;\
+rm files_to_merge.txt;"
+
+dx run swiss-army-knife \
+  -icmd="${merge_genotype_files}" \
+ --tag="merge genotype calls" \
+ --instance-type "mem1_ssd1_v2_x16" \
+ --destination="/Output/regenie/input/" \
+ --brief --yes
+
+ run_plink_qc="plink2 --bfile ukb22418_c1_22_v2_merged\
+ --keep ukb_unrel_eur_metabol.pheno --autosome\
+ --maf 0.01 --mac 20 --geno 0.1\
+ --hwe 1e-15 --mind 0.1\
+ --write-snplist --write-samples\
+ --no-id-header --out \
+ WGS_array_snps_qc_pass"
+
+ dx run swiss-army-knife \
+  -icmd="${run_plink_qc}" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bed" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bim" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.fam" \
+  -iin="/Output/regenie/ukb_unrel_eur_metabol.pheno" \
+ --tag="qc merged genotypes" \
+ --instance-type "mem1_ssd1_v2_x16" \
+ --destination="/Output/regenie/input/" \
+ --brief --yes
+
+ regenie_step1_meta="regenie --step 1\
+ --lowmem --out metabolite_regenie_step1 --bed ukb22418_c1_22_v2_merged\
+ --phenoFile ukb_unrel_eur_metabol.pheno --covarFile ukb_unrel_eur_covars.covar\
+ --extract WGS_array_snps_qc_pass.snplist\
+ --phenoCol f.23444.0.0 --phenoCol f.23451.0.0 --phenoCol f.23459.0.0 --phenoCol f.23443.0.0 --phenoCol f.23450.0.0\
+ --covarColList Age,sex_coded,genotype_array,AC,spectrometer,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10\
+ --catCovarList AC,spectrometer\
+ --maxCatLevels 23\
+ --bsize 1000 --loocv --gz --threads 16"
+
+  dx run swiss-army-knife \
+  -icmd="${regenie_step1_meta}" \
+  -iin="/Output/regenie/input/WGS_array_snps_qc_pass.snplist" \
+  -iin="/Output/regenie/ukb_unrel_eur_metabol.pheno" \
+  -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bed" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bim" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.fam" \
+ --tag="regenie step 1 metabolite" \
+ --instance-type "mem1_ssd1_v2_x16" \
+ --destination="/Output/regenie/input/" \
+ --brief --yes
+
+convert_vcf_bed="plink2 --vcf FEN1_varqc_sampqc_HWE_combined.vcf.gz --make-bed -out FEN1_varqc_sampqc_HWE_combined"
+dx run swiss-army-knife \
+  -icmd="${convert_vcf_bed}" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FEN1_varqc_sampqc_HWE_combined.vcf.gz" \
+  -iin="/Output/gene_VCF_variants/gene_vcfs/QC/FEN1_varqc_sampqc_HWE_combined.vcf.gz.tbi" \
+ --tag="convert FEN1 VCF" \
+ --instance-type "mem1_ssd1_v2_x16" \
+ --destination="/Output/regenie/input/WGS_BEDS/plink2" \
+ --brief --yes
+
+####### Running REGENIE step 2 using SAK (REGENIE VERSION 3.1.1)
+
+dx run swiss-army-knife \
+  -icmd="bash regenie_step2.sh TMEM258" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.fam" \
+  -iin="/Output/regenie/ukb_unrel_eur_metabol.pheno" \
+  -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
+  -iin="/Output/regenie/input/annotations_FADS.tsv" \
+  -iin="/Output/regenie/input/masks_FADS.txt" \
+  -iin="/Output/regenie/input/aaf_FADS.tsv" \
+  -iin="/Output/regenie/input/setlist_FADS.tsv" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_1.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_2.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_3.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_4.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_5.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_pred.list" \
+  -iin="/Code/regenie_step2.sh" \
+  --tag="regenie step 2 TMEM258" \
+  --instance-type "mem1_ssd1_v2_x16" \
+  --destination="/Output/regenie/step2_res/version3.2.6/" \
+  --brief --yes
+
+######## REGENIE QC of MDD 
+
+ run_plink_qc_mdd="plink2 --bfile ukb22418_c1_22_v2_merged\
+ --keep ukb_unrel_eur_pgc3_mdd.pheno --autosome\
+ --maf 0.01 --mac 20 --geno 0.1\
+ --hwe 1e-15 --mind 0.1\
+ --write-snplist --write-samples\
+ --no-id-header --out \
+ WGS_array_snps_qc_pass_pgc3_mdd"
+
+ dx run swiss-army-knife \
+  -icmd="${run_plink_qc_mdd}" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bed" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bim" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.fam" \
+  -iin="/Output/regenie/ukb_unrel_eur_pgc3_mdd.pheno" \
+ --tag="qc merged genotypes MDD phenotype" \
+ --instance-type "mem1_ssd1_v2_x16" \
+ --destination="/Output/regenie/input/" \
+ --brief --yes
+
+## REGENIE STEP 1 MDD
+
+ regenie_step1_mdd="regenie --step 1\
+ --lowmem --out mdd_regenie_step1 --bed ukb22418_c1_22_v2_merged\
+ --phenoFile ukb_unrel_eur_pgc3_mdd.pheno --covarFile ukb_unrel_eur_covars.covar\
+ --extract WGS_array_snps_qc_pass_pgc3_mdd.snplist\
+ --phenoCol MajDepr \
+ --covarColList Age,sex_coded,genotype_array,AC,spectrometer,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10\
+ --catCovarList AC,spectrometer\
+ --maxCatLevels 23\
+ --bsize 1000 --loocv --gz --threads 16"
+
+  dx run swiss-army-knife \
+  -icmd="${regenie_step1_mdd}" \
+  -iin="/Output/regenie/input/WGS_array_snps_qc_pass_pgc3_mdd.snplist" \
+  -iin="/Output/regenie/ukb_unrel_eur_pgc3_mdd.pheno" \
+  -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bed" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.bim" \
+  -iin="/Output/regenie/input/GRCh37_merged/ukb22418_c1_22_v2_merged.fam" \
+ --tag="regenie step 1 mdd" \
+ --instance-type "mem1_ssd1_v2_x16" \
+ --destination="/Output/regenie/input/" \
+ --brief --yes
+
+##### REGENIE STEP 2 MDD
+
+
+dx run swiss-army-knife \
+  -icmd="bash regenie_mdd_step2.sh FADS1" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.fam" \
+  -iin="/Output/regenie/ukb_unrel_eur_pgc3_mdd.pheno" \
+  -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
+  -iin="/Output/regenie/input/annotations_FADS.tsv" \
+  -iin="/Output/regenie/input/masks_FADS.txt" \
+  -iin="/Output/regenie/input/aaf_FADS.tsv" \
+  -iin="/Output/regenie/input/setlist_FADS.tsv" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_1.loco.gz" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_pred.list" \
+  -iin="/Code/regenie_mdd_step2.sh" \
+  --tag="regenie step 2 MDD FADS1" \
+  --instance-type "mem1_ssd1_v2_x16" \
+  --destination="/Output/regenie/step2_res/version3.2.6/" \
+  --brief --yes
