@@ -14,7 +14,9 @@ sed 's|/home/dnanexus/out/out/||' metabolite_regenie_step1_pred.list > basename_
 #bim$ID = paste0(bim$CHR, ":", bim$POS, ":", bim$A2, ":", bim$A1)
 #write.table(bim, "{gene}_varqc_sampqc_HWE_combined.bim", row.names =F, quote = F, col.names = F)
 
-regenie --step 2 \
+# Downloading latest version of REGENIE
+curl -O -L https://github.com/rgcgithub/regenie/releases/download/v3.2.6/regenie_v3.2.6.gz_x86_64_Linux_mkl.zip; unzip regenie_v3.2.6.gz_x86_64_Linux_mkl.zip -d /usr/local/bin/; chmod a+x /usr/local/bin/regenie_v3.2.6.gz_x86_64_Linux_mkl; rm regenie*.zip
+regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
  --bed ${GENE}_varqc_sampqc_HWE_combined \
   --phenoFile ukb_unrel_eur_metabol.pheno \
   --covarFile ukb_unrel_eur_covars.covar \
@@ -33,8 +35,8 @@ regenie --step 2 \
   --write-mask \
   --extract-setlist ${GENE} \
   --check-burden-files \
-  --joint acat \
-  --vc-tests skato,acato \
+  --joint acat,sbat,minp \
+  --vc-tests skat,skato,acato \
   --rgc-gene-p \
-  --bsize 200 \
+  --bsize 20 \
   --out metabolite_${GENE}_step2
