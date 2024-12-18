@@ -4,7 +4,7 @@ GENE=$1
 
 ### removing the dnanexus paths from the predlist file 
 
-sed 's|/home/dnanexus/out/out/||' mdd_regenie_step1_pred.list > basename_mdd_regenie_step1_pred.list
+sed 's|/home/dnanexus/out/out/||' mdd_regenie_step1_BT_pred.list > basename_mdd_regenie_step1_BT_pred.list
 
 ## Using the updated bim files
 # Manually in R 
@@ -26,7 +26,7 @@ regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
   --maxCatLevels 23 \
   --bt \
   --firth --approx \
-  --pred basename_mdd_regenie_step1_pred.list \
+  --pred basename_mdd_regenie_step1_BT_pred.list \
   --anno-file annotations_FADS.tsv \
   --set-list setlist_FADS.tsv  \
   --mask-def masks_FADS.txt \
@@ -40,4 +40,4 @@ regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
   --vc-tests skat,skato,acato \
   --rgc-gene-p \
   --bsize 20 \
-  --out mdd_${GENE}_step2
+  --out mdd_${GENE}_step2_BT
