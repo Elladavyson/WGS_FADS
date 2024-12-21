@@ -97,6 +97,52 @@ wgs_samples <- readr::read_lines('sample_names.txt')
 all_unrelated_wgs <- all_unrelated %>% 
 filter(f.eid %in% wgs_samples)
 
+## The demographic variables of this sample (unrelated, european with metabolomic data)
+
+summary_variables <- function(df) {
+ df_summary <- df %>% 
+summarise(mean_age = mean(Age, na.rm = T),
+sd_age = sd(Age, na.rm = TRUE),
+mean_bmi = mean(BMI, na.rm = T),
+sd_bmi = sd(BMI, na.rm = TRUE),
+mean_TDI = mean(TDI, na.rm = TRUE),
+sd_TDI = sd(TDI, na.rm = T),
+num_females = sum(sex_coded==0),
+num_males = sum(sex_coded == 1),
+num_current_smokers = sum(smoking_stat == "Current", na.rm = TRUE),
+num_never_smokers = sum(smoking_stat == "Never", na.rm = TRUE),
+num_previous_smokers = sum(smoking_stat == "Previous", na.rm = TRUE),
+num_uni = sum(uni_nouni == 1),
+num_nouni = sum(uni_nouni==0),
+num_white_ethnicity = sum(ethnicity_collapsed == 0, na.rm = TRUE),
+num_mixed_ethnicity = sum(ethnicity_collapsed == 1, na.rm = TRUE),
+num_other_ethnicity = sum(ethnicity_collapsed == 2, na.rm = TRUE),
+num_mdd_cases = sum(MajDepr == 2),
+num_mdd_controls = sum(MajDepr == 1),
+total = n()) %>% 
+mutate(Age_stat = paste0(signif(mean_age,3), " (", signif(sd_age, 3), ")"),
+BMI_stat = paste0(signif(mean_bmi,3), " (", signif(sd_bmi, 3), ")"),
+TDI_stat = paste0(signif(mean_TDI, 3), " (", signif(sd_TDI, 3), ")"),
+females_stat = paste0(num_females, " (", signif((num_females/total)*100,3), "%)"),
+current_stat = paste0(num_current_smokers, " (", signif((num_current_smokers/total)*100,3), "%)"),
+previous_stat = paste0(num_previous_smokers, " (", signif((num_previous_smokers/total)*100,3), "%)"),
+never_stat = paste0(num_never_smokers, " (", signif((num_never_smokers/total)*100,3), "%)"),
+uni_stat = paste0(num_uni, " (", signif((num_uni/total)*100,3), "%)"),
+nouni_stat = paste0(num_nouni, " (", signif((num_nouni/total)*100,3), "%)"),
+white_eth_stat = paste0(num_white_ethnicity, " (", signif((num_white_ethnicity/total)*100,3), "%)"),
+mixed_eth_stat = paste0(num_mixed_ethnicity, " (", signif((num_mixed_ethnicity/total)*100,3), "%)"),
+other_eth_stat = paste0(num_other_ethnicity, " (", signif((num_other_ethnicity/total)*100,3), "%)"),
+mdd_cases_stat = paste0(num_mdd_cases, " (", signif((num_mdd_cases/total)*100,3), "%)"),
+mdd_controls_stat = paste0(num_mdd_controls, " (", signif((num_mdd_controls/total)*100,3), "%)")
+) %>% 
+select(total, ends_with("stat")) %>% 
+as.data.frame()
+return(df_summary)
+}
+
+summary_baseline_eur_metabol <- summary_variables(all_unrelated_wgs %>% filter(!is.na(spectrometer)))
+write.table(summary_baseline_eur_metabol, "baseline_metabolite_eur_unrel_sample_demo.tsv", sep = "\t", row.names = F, quote = F)
+
 ## Distribution of metabolite levels in this sample (still normal)
 
 norm_meta_measures_unrel_eur <- all_unrelated_wgs %>% 
@@ -114,7 +160,8 @@ facet_wrap(~Metabolite) +
 theme_minimal() + 
 labs(x = "Normalised Metabolite Value", y = "Count", title = paste0("All unrelated participants of European ancestry with NMR data: n=", nrow(all_unrelated_wgs %>% filter(!is.na(spectrometer)))))
 
-
+summary_mdd_pheno <- summary_variables(all_unrelated_wgs %>% filter(MajDepr != -9))
+write.table(summary_mdd_pheno, "mdd3_pgc_eur_unrel_sample_demo.tsv", sep = "\t", row.names = F, quote = F)
 ######################
 
 # Phenotype file
@@ -131,6 +178,7 @@ select(FID, IID, MajDepr)
 mdd_pheno$MajDepr[mdd_pheno$MajDepr == -9] <- NA
 mdd_pheno$MajDepr <- mdd_pheno$MajDepr -1 
 lapply(mdd_pheno %>% select(-c(FID, IID)), function(column) table(column, useNA="always"))
+
 
 metabol_pheno <- all_unrelated_wgs %>% 
 filter(!is.na(spectrometer)) %>% 
@@ -164,3 +212,5 @@ write.table(covars, "ukb_unrel_eur_covars.covar", sep = "\t", row.names = F, quo
 # dx upload ukb_unrel_eur_covars.covar
 # dx upload ukb_unrel_eur_pgc3_mdd.pheno
 # dx upload ukb_unrel_eur_metabol.pheno
+# dx upload mdd3_pgc_eur_unrel_sample_demo.tsv
+# dx upload baseline_metabolite_eur_unrel_sample_demo.tsv
