@@ -457,13 +457,15 @@ dx run swiss-army-knife \
 ## REGENIE STEP 1 MDD
 
  regenie_step1_mdd="regenie --step 1\
- --lowmem --out mdd_regenie_step1 --bed ukb22418_c1_22_v2_merged\
+ --lowmem --out mdd_regenie_step1_BT --bed ukb22418_c1_22_v2_merged\
  --phenoFile ukb_unrel_eur_pgc3_mdd.pheno --covarFile ukb_unrel_eur_covars.covar\
  --extract WGS_array_snps_qc_pass_pgc3_mdd.snplist\
  --phenoCol MajDepr \
  --covarColList Age,sex_coded,genotype_array,AC,spectrometer,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10\
  --catCovarList AC,spectrometer\
  --maxCatLevels 23\
+ --bt \
+ --firth --approx \
  --bsize 1000 --loocv --gz --threads 16"
 
   dx run swiss-army-knife \
@@ -483,7 +485,28 @@ dx run swiss-army-knife \
 
 
 dx run swiss-army-knife \
-  -icmd="bash regenie_mdd_step2.sh FADS1" \
+  -icmd="bash regenie_mdd_step2.sh FEN1" \
+  -iin="/Output/regenie/input/WGS_BEDS/FEN1_varqc_sampqc_HWE_combined.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/FEN1_varqc_sampqc_HWE_combined.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/FEN1_varqc_sampqc_HWE_combined.fam" \
+  -iin="/Output/regenie/ukb_unrel_eur_pgc3_mdd.pheno" \
+  -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
+  -iin="/Output/regenie/input/annotations_FADS.tsv" \
+  -iin="/Output/regenie/input/masks_FADS.txt" \
+  -iin="/Output/regenie/input/aaf_FADS.tsv" \
+  -iin="/Output/regenie/input/setlist_FADS.tsv" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_BT_1.loco.gz" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_BT_pred.list" \
+  -iin="/Code/regenie_mdd_step2.sh" \
+  --tag="regenie step 2 MDD FEN1" \
+  --instance-type "mem1_ssd1_v2_x16" \
+  --destination="/Output/regenie/step2_res/version3.2.6/MDD/bt_pred/" \
+  --brief --yes
+
+# LOVO run FOR mask 4 0.01
+
+dx run swiss-army-knife \
+  -icmd="bash regenie_mdd_lovo.sh FADS1" \
   -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.bed" \
   -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.bim" \
   -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.fam" \
@@ -495,8 +518,37 @@ dx run swiss-army-knife \
   -iin="/Output/regenie/input/setlist_FADS.tsv" \
   -iin="/Output/regenie/input/mdd_regenie_step1_1.loco.gz" \
   -iin="/Output/regenie/input/mdd_regenie_step1_pred.list" \
-  -iin="/Code/regenie_mdd_step2.sh" \
-  --tag="regenie step 2 MDD FADS1" \
+  -iin="/Code/regenie_mdd_lovo.sh" \
+  --tag="regenie step 2 MDD LOVO FADS1" \
   --instance-type "mem1_ssd1_v2_x16" \
-  --destination="/Output/regenie/step2_res/version3.2.6/" \
+  --destination="/Output/regenie/step2_res/version3.2.6/MDD/" \
+  --brief --yes
+
+ ## LD heatmaps
+
+dx run swiss-army-knife \
+  -icmd="Rscript LD_heatmaps.R" \
+  -iin="/Output/regenie/regenie_LD/mdd_FADS1_step2_BT_LD_cor.corr" \
+  -iin="/Output/regenie/regenie_LD/mdd_FADS1_step2_BT_LD_cor.corr.snplist" \
+  -iin="/Output/regenie/regenie_LD/mdd_FADS2_step2_BT_LD_cor.corr" \
+  -iin="/Output/regenie/regenie_LD/mdd_FADS2_step2_BT_LD_cor.corr.snplist" \
+  -iin="/Output/regenie/regenie_LD/mdd_FADS3_step2_BT_LD_cor.corr" \
+  -iin="/Output/regenie/regenie_LD/mdd_FADS3_step2_BT_LD_cor.corr.snplist" \
+  -iin="/Output/regenie/regenie_LD/mdd_MYRF_step2_BT_LD_cor.corr" \
+  -iin="/Output/regenie/regenie_LD/mdd_MYRF_step2_BT_LD_cor.corr.snplist" \
+  -iin="/Output/regenie/regenie_LD/mdd_FEN1_step2_BT_LD_cor.corr" \
+  -iin="/Output/regenie/regenie_LD/mdd_FEN1_step2_BT_LD_cor.corr.snplist" \
+  -iin="/Output/regenie/regenie_LD/mdd_TMEM258_step2_BT_LD_cor.corr" \
+  -iin="/Output/regenie/regenie_LD/mdd_TMEM258_step2_BT_LD_cor.corr.snplist" \
+  -iin="/Input/FADS_cluster_UKB_pVCF.tsv" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/FADS1_priority_annot_chrposrefalt.txt" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/FADS2_priority_annot_chrposrefalt.txt" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/FADS3_priority_annot_chrposrefalt.txt" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/FEN1_priority_annot_chrposrefalt.txt" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/MYRF_priority_annot_chrposrefalt.txt" \
+  -iin="/Output/gene_VCF_variants/variants/pri_variants/chrpos/chrposrefalt_gene_canonical/TMEM258_priority_annot_chrposrefalt.txt" \
+  -iin="/Code/LD_heatmaps.R" \
+  --tag="LD heatmaps" \
+  --instance-type "mem1_ssd1_v2_x16" \
+  --destination="/Output/regenie/regenie_LD/" \
   --brief --yes
