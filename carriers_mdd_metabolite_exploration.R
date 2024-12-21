@@ -12,76 +12,157 @@ library(ggsignif) # Have to install
 
 # dx download /Output/genotypes/genotype_summary/all_priority/*_carrier_info.tsv
 # dx download /Output/genotypes/genotype_summary/all_priority/*_participant_var_summary.tsv
+# dx download /Output/genotypes/genotype_summary/all_priority/*_variant_zygosity.tsv
+# dx download /Output/genotypes/genotype_summary/all_priority/*_carriers_genotypes.tsv
 # dx download /Input/FADS_cluster_UKB_pVCF.tsv
 # dx download /Input/MajorDepression.ukb24262.2021-07.txt
 # dx download data_participant_all.csv
 # dx download data_participant_metabolomics.csv
+# dx download /Output/regenie/ukb_unrel_eur_covars.covar
+# dx download /Output/regenie/ukb_unrel_eur_metabol.pheno
+# dx download /Output/regenie/ukb_unrel_eur_pgc3_mdd.pheno
+# dx download /Output/regenie/input/annotations_FADS.tsv
+# dx download /Output/regenie/input/masks_FADS.txt
+
+# Looking at explicitly FADS1 Mask4 0.01 and FADS1 Mask 5 0.01
+# Also look at TMEM258 for Mask4 Singletons and Mask5 singletons to see the differences in distributions
 
 # carriers info 
 print("--------------------------------------------------")
 print("READING IN DATA")
 print("--------------------------------------------------")
+# Reading in the mask file
+masks <- read.table("masks_FADS.txt", header = F)
+# the annotation file
+annotations <- read.table("annotations_FADS.tsv", sep = "\t", header = F)
+colnames(annotations) <- c("variant", "gene", "annotation")
+annotations <- annotations %>% 
+mutate(variant_match= paste0("chr", variant)) %>% 
+mutate(variant_match = gsub(":", "_", variant_match))
 # Read in the FADS cluster co-ordinates file
 print("Reading in carrier information")
 fads_genes <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t" , header = T)
 for (i in 1:nrow(fads_genes)){
     gene <- fads_genes$hgnc_symbol[i]
+    print(gene)
     gene_carrier <- read.table(paste0(gene, "_carrier_info.tsv"), sep = "\t", header = T)
-    colnames(gene_carrier) <- c("SAMPLE", paste0(gene, "_status"))
+    colnames(gene_carrier) <- c("SAMPLE", "status")
+    gene_carrier <- gene_carrier %>% mutate(GENE = gene)
     zygosity <- fread(paste0(gene, "_variant_zygosity.tsv"), sep = "\t") %>% as.data.frame()
     participant_summary <- fread(paste0(gene, "_participant_var_summary.tsv"), sep="\t") %>% as.data.frame()
+    participant_genotype <- fread(paste0(gene, "_carriers_genotypes.tsv"), sep = "\t", header = T) %>% as.data.frame()
+    participant_genotype <- participant_genotype %>% 
+    separate_rows(., het_variants, sep = ":")
+    annotations_gene <- annotations %>% filter(gene == gene)
+    participant_genotype <- left_join(participant_genotype, annotations_gene, by=c("het_variants"= "variant_match"))
+    participant_genotype <- participant_genotype %>% 
+    mutate(Mask1_status = ifelse(annotation == "LoF", "carrier", "non-carrier"),
+    Mask2_status = ifelse(annotation == "LoF" | annotation == "H_IMPACT", "carrier", "non-carrier"),
+    Mask3_status = ifelse(annotation == "LoF" | annotation == "H_IMPACT" | annotation == "REVEL", "carrier", "non-carrier"),
+    Mask4_status = ifelse(annotation == "LoF" | annotation == "H_IMPACT" | annotation == "REVEL" | annotation == "CADD", "carrier", "non-carrier"),
+    Mask5_status = ifelse(annotation == "LoF" | annotation == "H_IMPACT" | annotation == "REVEL" | annotation == "CADD" | annotation == "MOD_IMPACT", "carrier", "non-carrier")
+    )
+    participant_geno_all <- participant_genotype %>% select(SAMPLE, starts_with("Mask")) 
+   # For carriers of multiple varaints, ensure no duplications and they are marked as a carrier of the most deleterious variant (i.e the smallest mask)
+   # Get the participants with duplicate rows (compound heterozygous)
+   participant_geno_duplicated <- participant_geno_all  %>%
+  filter(duplicated(SAMPLE) | duplicated(SAMPLE, fromLast = TRUE))  
+  # Convert to long format, order by Mask (1-5) and assign an ID column for selection
+  dup_long <- participant_geno_duplicated %>% 
+    pivot_longer(cols=starts_with("Mask"),
+    names_to = "Mask",
+    values_to = "Mask_status") %>% 
+    group_by(SAMPLE, Mask) %>% 
+    arrange(SAMPLE, Mask) %>% 
+    mutate(id = row_number()) %>% 
+    ungroup()
+    # Select the row which has the carrier status in the smallest mask
+    dup_unique_id <- dup_long %>% 
+    group_by(SAMPLE) %>% 
+    filter(Mask_status == "carrier") %>% 
+    slice_min(Mask, with_ties = TRUE) %>% 
+    slice_sample(n=1) %>%
+    ungroup() 
+    # Merge the identified rows with the original duplicated dataframe by the ID column, to select just the rows with the smallest mask
+uniq_long <- merge(dup_long, dup_unique_id %>% select(SAMPLE, id), by= c("SAMPLE", "id"))
+uniq_wide <- uniq_long %>%   pivot_wider(names_from = "Mask", values_from = "Mask_status")
+# Select those non duplicated to rbind to 
+geno_non_duplicated <- participant_geno_all %>%
+  filter(!duplicated(SAMPLE) & !duplicated(SAMPLE, fromLast = TRUE))
+  participant_geno_merge <- bind_rows(uniq_wide, geno_non_duplicated)
+
+carriers <- gene_carrier %>% filter(status == "carrier")
+carriers <- carriers %>% 
+    left_join(participant_geno_merge %>% select(-id), by = "SAMPLE")
+non_carriers <- gene_carrier %>% filter(status == "non-carrier")
+non_carriers <- non_carriers %>% 
+mutate(Mask1_status = "non-carrier",
+    Mask2_status = "non-carrier",
+    Mask3_status = "non-carrier",
+    Mask4_status = "non-carrier",
+    Mask5_status = "non-carrier") 
+gene_carrier <- rbind(carriers, non_carriers)
+participant_summary <- merge(participant_summary, gene_carrier, by = "SAMPLE")
     assign(paste0(gene, "_carriers"), gene_carrier)
     assign(paste0(gene, "_variants"), zygosity)
     assign(paste0(gene, "_part_summary"), participant_summary)
+    assign(paste0(gene, "_part_genotype"), participant_geno_merge)
 }
-print("Reading in MDD phenotype")
-mdd <- read.table("MajorDepression.ukb24262.2021-07.txt", header = T)
-print("Reading in cohort data")
+
+print("Reading in MDD phenotype file")
+mdd <- read.table("ukb_unrel_eur_pgc3_mdd.pheno", header = T)
+print("Reading in the Metabolite phenotype file")
+metabol <- read.table("ukb_unrel_eur_metabol.pheno", header = T)
+print("The covariate file")
+covars <- read.table("ukb_unrel_eur_covars.covar", header = T)
 # Read in all cohort info 
 all <- read.csv("data_participant_all.csv")
 # colnames "eid" "p31"  "p34" "p22189" "p54_i0" "p21000_i0" "p21003_i0" "p21001_i0" "p20116_i0" "p6138_i0"  "p23449_i0" "p23444_i0" "p23450_i0" "p23457_i0" "p23459_i0" "p23443_i0"
 colnames(all) <- c("f.eid", "Sex", "yob", "TDI", "AC", "ethnicity", "Age","BMI", "smoking_stat", "qualifications", "f.23449.0.0", "f.23444.0.0", "f.23450.0.0", "f.23457.0.0", "f.23459.0.0", "f.23443.0.0")
 
-###################################################################################
-
-# Number of prioritised variants and carriers per gene 
 
 ###################################################################################
 
-carriers_split <- function(df, gene) {
-    df <- df %>% rename("status"= paste0(gene, "_status")) %>% 
-    mutate(GENE = gene)
-    return(df)
-}
+# Number of prioritised variants and carriers per Mask and per gene
 
-part_summary <- function(df, gene) {
+###################################################################################
+
+part_summary <- function(df, carriers_df, gene) {
     df <- df %>% 
     mutate(carrier_type = case_when(num_althet_vars == 0 & num_althom_vars == 0 ~ "Non-carrier",
     num_althet_vars == 1 & num_althom_vars == 0 ~ "Alternate heterozgyous",
     num_althet_vars > 1 & num_althom_vars == 0 ~ "Compound heterozygous",
     num_althet_vars == 0 & num_althom_vars > 0 ~ "Alternate homozygous",
     num_althet_vars > 0 & num_althom_vars > 0 ~ "Alternate heterozygous & alternate homozygous"))
-    df <- df %>% mutate(GENE = gene)
     return(df)
 }
 
-gene_carriers_list <- list(carriers_split(FADS1_carriers, "FADS1"), carriers_split(FADS2_carriers, "FADS2"), carriers_split(FADS3_carriers, "FADS3"), carriers_split(FEN1_carriers, "FEN1"),
- carriers_split(MYRF_carriers, "MYRF"), carriers_split(TMEM258_carriers, "TMEM258"))
- part_summary_list <- list(part_summary(FADS1_part_summary ,"FADS1"), part_summary(FADS2_part_summary,"FADS2"),
- part_summary(FADS3_part_summary, "FADS3"), part_summary(FEN1_part_summary, "FEN1"), part_summary(MYRF_part_summary, "MYRF"),
- part_summary(TMEM258_part_summary, "TMEM258"))
+part_summary_list <- list(part_summary(FADS1_part_summary ,"FADS1"), part_summary(FADS2_part_summary,"FADS2"),
+part_summary(FADS3_part_summary, "FADS3"), part_summary(FEN1_part_summary, "FEN1"), part_summary(MYRF_part_summary, "MYRF"),
+part_summary(TMEM258_part_summary, "TMEM258"))
 variant_zygosity_list <- list(FADS1_variants, FADS2_variants, FADS3_variants, FEN1_variants, MYRF_variants, TMEM258_variants)
-
+gene_carriers_list <- list(FADS1_carriers, FADS2_carriers, FADS3_carriers, FEN1_carriers, MYRF_carriers, TMEM258_carriers)
 gene_carriers_all <- do.call(rbind, gene_carriers_list)
 part_summary_all <- do.call(rbind, part_summary_list)
 variant_zy_all <- do.call(rbind, variant_zygosity_list)
 
-carrier_types_plt <- ggplot(part_summary_all %>% 
-filter(carrier_type != "Non-carrier"), aes(x = GENE, fill = carrier_type))+ 
-geom_bar(stat="Count", position = "dodge") + 
-geom_text(stat = "count", aes(label = after_stat(count), color = carrier_type), position = position_dodge(width = 0.8), vjust = -0.5, size = 3, show.legend = FALSE) +
+# Participant summary information (what type of carriers etc)
+part_summary_all_long <- part_summary_all %>% 
+pivot_longer(cols = starts_with('Mask'),
+names_to="Mask",
+values_to = "Carrier_status") %>%
+mutate(Mask = gsub("_status", "", Mask))
+
+part_carriers_summary <- part_summary_all_long %>% group_by(
+  GENE, Mask, Carrier_status, carrier_type
+) %>%
+summarise(Count = n(), .groups = "drop")
+
+carrier_types_plt_permask <- ggplot(part_carriers_summary %>% filter(Carrier_status != "non-carrier"), aes(x = Mask, y = Count, fill = carrier_type))+ 
+geom_bar(stat="identity", position = "dodge") + facet_wrap(~GENE) + 
+geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 0.8), vjust = -0.5, size = 3, show.legend = FALSE) +
 theme_minimal() + 
-labs(x = "Gene", y = "Count", fill = "Carrier type") + guides(color= guide_legend(label = FALSE))
+labs(x = "Gene", y = "Count", fill = "Carrier type") + guides(color= guide_legend(label = FALSE)) 
 
 carrier_numbers_plt <- ggplot(gene_carriers_all, aes(x= "status", fill=status)) + 
 geom_bar(stat="count", position = "dodge") + 
@@ -89,13 +170,13 @@ geom_text(stat = "count", aes(label = after_stat(count), color = status), positi
 theme_minimal() + 
 labs(x = "", y = "Count", fill = "") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
 
-#### Are there some people who carry a prioritised variant in more than one gene? 
+
 
 gene_carriers_all %>% 
 group_by(SAMPLE) %>% 
 summarise(numgenes_carriers=sum(status=='carrier')) %>% pull(numgenes_carriers) %>% table() 
 
-ggsave(filename ="carrier_types_genes_all.png", carrier_types_plt, width = 10, height = 6, device = "png", dpi = 300)
+ggsave(filename ="carrier_types_genes_permask.png", carrier_types_plt_permask, width = 10, height = 6, device = "png", dpi = 300)
 ggsave(filename= "carrier_numbers_all.png", carrier_numbers_plt,width = 8, height = 10, device = "png", dpi = 300) 
 
 ###############################################################################
