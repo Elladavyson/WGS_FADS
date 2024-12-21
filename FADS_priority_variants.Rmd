@@ -41,85 +41,6 @@ Yes, they are all included
 table(FADS1_priority_var$chr_pos_ref_alt %in% FADS2_priority_var$chr_pos_ref_alt)
 ```
 
-### Plotting the genes and their variants 
-
-```{r}
-mane_transcripts <- c("FADS1"="ENST00000350997",
-                      "FADS2"="ENST00000278840",
-                      "FADS3"="ENST00000278829",
-                      "FEN1"="ENST00000305885",
-                      "MYRF"="ENST00000278836",
-                      "TMEM258"="ENST00000537328")
-
-## Saving genomic region variant objects of the genes 
-for (i in c(1:nrow(FADS))) {
-  gene <- FADS$hgnc_symbol[i]
-  transcript <- mane_transcripts[[gene]] %>% as.character()
-Ensembl_file <- paste0("gene_ensembl_files/ExonsSpreadsheet-Homo_sapiens_Transcript_Exons_", transcript, "_", gene, ".csv")
-  gene_start <- FADS$start_position[i]
-  gene_end <- FADS$end_position[i]
-  strand <- FADS$strand[i]
-  ensembl <- read_csv(Ensembl_file) %>% 
-as.data.frame() %>% 
-select(-Sequence) %>% 
-filter(!grepl('sequence', `Exon / Intron`)) %>%
-mutate(ExonIntron = ifelse(grepl('Intron',`Exon / Intron`), "Intron", "Exon"))%>% 
-mutate(color_for_lolliplot = ifelse(ExonIntron=="Intron","#26913D","#07C5F5"))
-  if (strand == -1) {
-features <- GRanges("chr11", IRanges(start=c(ensembl$End %>% rev()),
-end=c(ensembl$Start %>% rev()),
-names = c(ensembl$ExonIntron %>% rev()),
-))
-features$fill <- c(ensembl$color_for_lolliplot %>% rev())
-} else if (strand == 1) {
-features <- GRanges("chr11", IRanges(start=c(ensembl$Start),
-end=c(ensembl$End),
-names = c(ensembl$ExonIntron),
-))
-features$fill <-  c(ensembl$color_for_lolliplot)
-} else {
-    stop("Provide strand info for plotting")
-}
-  # Read in prioritised variants 
-    variant <- read.table(paste0("vep_res/AC_overzero/", gene, "_vepoutput_proc/", gene, "_priority_annot.tsv"), sep = "\t", header = T)
-  # Read in variant zygosity
-    variant_zygosity <- fread(paste0("variant_althet_counts/", gene, "_variant_zygosity.tsv"), sep = "\t")
-    # Merge together 
-variant <- merge(variant, variant_zygosity %>% select(-c(CHR, POS, REF, ALT)), by = "chr_pos_ref_alt")
-variant <- variant %>% mutate(color_for_lolliplot_impact = case_when(IMPACT == "HIGH" ~ "red", IMPACT == "MODERATE" ~ "orange", IMPACT == "LOW" ~ "#90EE90", IMPACT == "MODIFIER" ~ "lightpink"))
-SNP <- as.numeric(variant$POS)
-sample.gr <- GRanges(unique(variant$CHR), 
-IRanges(SNP, width=1, names=c(1:length(SNP))), 
-strand=ifelse(strand == 1, "+", "-"))
-sample.gr$color <- variant$color_for_lolliplot_impact
-sample.gr$label.parameter.label <- ""
-sample.gr$score <- variant$althet_carriers
-sample.gr$node.label <- as.character(sample.gr$score)
-legend <- list(labels=c("HIGH" , "MODERATE", "LOW", "MODIFIER"), 
-               col = c("red","orange", "#90EE90", "lightpink"), 
-               fill = c("red","orange", "#90EE90", "lightpink"))
-if(max(variant$althet_carriers) > 1000) {
-text_gpar <- gpar(fontsize=7, col="black")
-sample.gr$node.label.cex <- 0.6
-} else if (max(variant$althet_carriers > 100)) {
-  text_gpar <- gpar(fontsize=8, col="black")
-sample.gr$node.label.cex <- 0.75
-} else {
-  text_gpar <- gpar(col="black")
-sample.gr$node.label.cex <- 1
-}
-print(paste0("Saving the lolliplot to ", gene, "_lolliplot_variants_pri.png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_lolliplot_variants_all.png"),
-    width = 4000, height = 1200, res = 300, type = "cairo")
-lolliplot(sample.gr, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
-grid.text(paste0("Prioritised variants in ", gene), x=.5, y=.8, just="top", 
-          gp=gpar(cex=1.5, fontface="bold"))
-dev.off()
-variant$GENE <- gene
-assign(paste0(gene, "_pri_vars_genoinfo"), variant)
-}
-
-```
 ## Generating the annotations file for REGENIE masks
 
 The annotation file is in the following format
@@ -264,6 +185,215 @@ mask_af_plt
 
 The biggest change in number of variants is between singleton variants and 0.01, so just include two aaf bins in REGENIE, using --aaf-bins 0.01 
 (singletons are always included as a default in addition to this flag)
+
+## Lolliplots of each Mask 
+
+
+```{r}
+mane_transcripts <- c("FADS1"="ENST00000350997",
+                      "FADS2"="ENST00000278840",
+                      "FADS3"="ENST00000278829",
+                      "FEN1"="ENST00000305885",
+                      "MYRF"="ENST00000278836",
+                      "TMEM258"="ENST00000537328")
+
+## Saving genomic region variant objects of the genes 
+for (i in c(1:nrow(FADS))) {
+  gene <- FADS$hgnc_symbol[i]
+  transcript <- mane_transcripts[[gene]] %>% as.character()
+Ensembl_file <- paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/gene_ensembl_files/ExonsSpreadsheet-Homo_sapiens_Transcript_Exons_", transcript, "_", gene, ".csv")
+  gene_start <- FADS$start_position[i]
+  gene_end <- FADS$end_position[i]
+  strand <- FADS$strand[i]
+  ensembl <- read_csv(Ensembl_file) %>% 
+as.data.frame() %>% 
+select(-Sequence) %>% 
+filter(!grepl('sequence', `Exon / Intron`)) %>%
+mutate(ExonIntron = ifelse(grepl('Intron',`Exon / Intron`), "Intron", "Exon"))%>% 
+mutate(color_for_lolliplot = ifelse(ExonIntron=="Intron","#26913D","#07C5F5"))
+  if (strand == -1) {
+features <- GRanges("chr11", IRanges(start=c(ensembl$End %>% rev()),
+end=c(ensembl$Start %>% rev()),
+names = c(ensembl$ExonIntron %>% rev()),
+))
+features$fill <- c(ensembl$color_for_lolliplot %>% rev())
+} else if (strand == 1) {
+features <- GRanges("chr11", IRanges(start=c(ensembl$Start),
+end=c(ensembl$End),
+names = c(ensembl$ExonIntron),
+))
+features$fill <-  c(ensembl$color_for_lolliplot)
+} else {
+    stop("Provide strand info for plotting")
+}
+  # Read in prioritised variants 
+    variant <- read.table(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/vep_res/AC_overzero/", gene, "_vepoutput_proc/", gene, "_priority_annot.tsv"), sep = "\t", header = T)
+  # Read in variant zygosity
+    variant_zygosity <- fread(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/variant_althet_counts/", gene, "_variant_zygosity.tsv"), sep = "\t")
+    # Merge together 
+variant <- merge(variant, variant_zygosity %>% select(-c(CHR, POS, REF, ALT)), by = "chr_pos_ref_alt")
+variant <- variant %>% mutate(color_for_lolliplot_impact = case_when(IMPACT == "HIGH" ~ "red", IMPACT == "MODERATE" ~ "orange", IMPACT == "LOW" ~ "#90EE90", IMPACT == "MODIFIER" ~ "lightpink"))
+priority_gene <- priority_var_all %>% filter(SYMBOL == gene)
+# For each mask
+if (gene != "FEN1") {
+for (j in 1:5) {
+  print(j)
+  print(paste0("Mask", j, ": plotting 0.01 and singleton masks"))
+  print("0.01")
+  variant_0.01_mask <- priority_gene[priority_gene[, paste0("mask", j, "_0.01")] == 1, ]
+  variant_0.01 <- variant %>% filter(chr_pos_ref_alt %in% variant_0.01_mask$chr_pos_ref_alt)
+  print("Making the 0.01 variant object")
+  SNP_0.01 <- as.numeric(variant_0.01$POS)
+  print("Chr")
+sample.gr.0.01 <- GRanges(unique(variant_0.01$CHR), 
+IRanges(SNP_0.01, width=1, names=c(1:length(SNP_0.01))), 
+strand=ifelse(strand == 1, "+", "-"))
+print("Setting parameters")
+
+sample.gr.0.01$color <- variant_0.01$color_for_lolliplot_impact
+print("Label")
+sample.gr.0.01$label.parameter.label <- ""
+print("Score")
+sample.gr.0.01$score <- variant_0.01$althet_carriers
+print("node label")
+sample.gr.0.01$node.label <- as.character(sample.gr.0.01$score)
+print("legend")
+legend <- list(labels=c("HIGH" , "MODERATE", "LOW", "MODIFIER"), 
+               col = c("red","orange", "#90EE90", "lightpink"), 
+               fill = c("red","orange", "#90EE90", "lightpink"))
+if(max(variant_0.01$althet_carriers) > 1000) {
+text_gpar <- gpar(fontsize=7, col="black")
+sample.gr.0.01$node.label.cex <- 0.6
+} else if (max(variant_0.01$althet_carriers > 100)) {
+  text_gpar <- gpar(fontsize=8, col="black")
+sample.gr.0.01$node.label.cex <- 0.75
+} else {
+  text_gpar <- gpar(col="black")
+sample.gr.0.01$node.label.cex <- 1
+}
+# Saving the 0.01 Mask
+print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"),
+    width = 4000, height = 1200, res = 300, type = "cairo")
+lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
+grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
+          gp=gpar(cex=1.5, fontface="bold"))
+dev.off()
+# Saving the singleton Mask
+print("singletons")
+  variant_singleton_mask <- priority_gene[priority_gene[, paste0("mask",j, "_singleton")]==1,]
+  variant_singleton <- variant %>% filter(chr_pos_ref_alt %in% variant_singleton_mask$chr_pos_ref_alt)
+    SNP_singleton <- as.numeric(variant_singleton$POS)
+sample.gr.singleton <- GRanges(unique(variant_singleton$CHR), 
+IRanges(SNP_singleton, width=1, names=c(1:length(SNP_singleton))), 
+strand=ifelse(strand == 1, "+", "-"))
+sample.gr.singleton$color <- variant_singleton$color_for_lolliplot_impact
+sample.gr.singleton$label.parameter.label <- ""
+sample.gr.singleton$score <- variant_singleton$althet_carriers
+sample.gr.singleton$node.label <- as.character(sample.gr.singleton$score)
+legend <- list(labels=c("HIGH" , "MODERATE", "LOW", "MODIFIER"), 
+               col = c("red","orange", "#90EE90", "lightpink"), 
+               fill = c("red","orange", "#90EE90", "lightpink"))
+if(max(variant_singleton$althet_carriers) > 1000) {
+text_gpar <- gpar(fontsize=7, col="black")
+sample.gr.singleton$node.label.cex <- 0.6
+} else if (max(variant_singleton$althet_carriers > 100)) {
+  text_gpar <- gpar(fontsize=8, col="black")
+sample.gr.singleton$node.label.cex <- 0.75
+} else {
+  text_gpar <- gpar(col="black")
+sample.gr.singleton$node.label.cex <- 1
+}
+print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"),
+    width = 4000, height = 1200, res = 300, type = "cairo")
+lolliplot(sample.gr.singleton, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
+grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
+          gp=gpar(cex=1.5, fontface="bold"))
+dev.off()
+}
+} else if (gene == "FEN1") {
+  for (j in 2:5) {
+  print(j)
+  print(paste0("Mask", j, ": plotting 0.01 and singleton masks"))
+  print("0.01")
+  variant_0.01_mask <- priority_gene[priority_gene[, paste0("mask", j, "_0.01")] == 1, ]
+  variant_0.01 <- variant %>% filter(chr_pos_ref_alt %in% variant_0.01_mask$chr_pos_ref_alt)
+  print("Making the 0.01 variant object")
+  SNP_0.01 <- as.numeric(variant_0.01$POS)
+  print("Chr")
+sample.gr.0.01 <- GRanges(unique(variant_0.01$CHR), 
+IRanges(SNP_0.01, width=1, names=c(1:length(SNP_0.01))), 
+strand=ifelse(strand == 1, "+", "-"))
+print("Setting parameters")
+
+sample.gr.0.01$color <- variant_0.01$color_for_lolliplot_impact
+print("Label")
+sample.gr.0.01$label.parameter.label <- ""
+print("Score")
+sample.gr.0.01$score <- variant_0.01$althet_carriers
+print("node label")
+sample.gr.0.01$node.label <- as.character(sample.gr.0.01$score)
+print("legend")
+legend <- list(labels=c("HIGH" , "MODERATE", "LOW", "MODIFIER"), 
+               col = c("red","orange", "#90EE90", "lightpink"), 
+               fill = c("red","orange", "#90EE90", "lightpink"))
+if(max(variant_0.01$althet_carriers) > 1000) {
+text_gpar <- gpar(fontsize=7, col="black")
+sample.gr.0.01$node.label.cex <- 0.6
+} else if (max(variant_0.01$althet_carriers > 100)) {
+  text_gpar <- gpar(fontsize=8, col="black")
+sample.gr.0.01$node.label.cex <- 0.75
+} else {
+  text_gpar <- gpar(col="black")
+sample.gr.0.01$node.label.cex <- 1
+}
+# Saving the 0.01 Mask
+print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"),
+    width = 4000, height = 1200, res = 300, type = "cairo")
+lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
+grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
+          gp=gpar(cex=1.5, fontface="bold"))
+dev.off()
+# Saving the singleton Mask
+print("singletons")
+  variant_singleton_mask <- priority_gene[priority_gene[, paste0("mask",j, "_singleton")]==1,]
+  variant_singleton <- variant %>% filter(chr_pos_ref_alt %in% variant_singleton_mask$chr_pos_ref_alt)
+    SNP_singleton <- as.numeric(variant_singleton$POS)
+sample.gr.singleton <- GRanges(unique(variant_singleton$CHR), 
+IRanges(SNP_singleton, width=1, names=c(1:length(SNP_singleton))), 
+strand=ifelse(strand == 1, "+", "-"))
+sample.gr.singleton$color <- variant_singleton$color_for_lolliplot_impact
+sample.gr.singleton$label.parameter.label <- ""
+sample.gr.singleton$score <- variant_singleton$althet_carriers
+sample.gr.singleton$node.label <- as.character(sample.gr.singleton$score)
+legend <- list(labels=c("HIGH" , "MODERATE", "LOW", "MODIFIER"), 
+               col = c("red","orange", "#90EE90", "lightpink"), 
+               fill = c("red","orange", "#90EE90", "lightpink"))
+if(max(variant_singleton$althet_carriers) > 1000) {
+text_gpar <- gpar(fontsize=7, col="black")
+sample.gr.singleton$node.label.cex <- 0.6
+} else if (max(variant_singleton$althet_carriers > 100)) {
+  text_gpar <- gpar(fontsize=8, col="black")
+sample.gr.singleton$node.label.cex <- 0.75
+} else {
+  text_gpar <- gpar(col="black")
+sample.gr.singleton$node.label.cex <- 1
+}
+print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"),
+    width = 4000, height = 1200, res = 300, type = "cairo")
+lolliplot(sample.gr.singleton, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
+grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
+          gp=gpar(cex=1.5, fontface="bold"))
+dev.off()
+}
+}
+}
+
+```
+
 ## REGENIE Input
 
 Saving an annotation file for REGENIE Input
@@ -306,5 +436,33 @@ aaf_file <- priority_var_all %>%
 # Use the --set-singletons flag as this AAF file has provided information on whether it's a singleton
 
 write.table(aaf_file, "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/REGENIE input/aaf_FADS.tsv", sep = "\t", col.names = F, row.names = F, quote = F)
+```
+
+In Mask 4 0.01, I ran a LOVO scheme which should perform the burden test removing each variant at a time. This mask has 83 variants (FADS1), however the results is only for 42 variants (?). Not sure why there is a drop off. 
+
+```{r}
+# Reading in the REGENIE mask 4 LOVO output 
+
+lovo <- read.table("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/regenie_step2/mdd/mdd_FADS1_step2_LOVO_MajDepr.regenie", header = T)
+
+mask4_0.01 <- priority_var_all %>% filter(mask4_0.01 == 1 & SYMBOL == "FADS1") 
+mask4_0.01 <- mask4_0.01 %>% mutate(
+  variant = gsub("chr11", "11", chr_pos_ref_alt)
+) %>% 
+  mutate(
+    variant = gsub("_", ":", variant)
+  )
+lovo$variant <- gsub("FADS1.Mask4.0.01_", "", lovo$ID)
+mask4_0.01 <- mask4_0.01 %>% mutate(
+  inlovo = ifelse(variant %in% lovo$variant, "YES", "NO")
+)
+
+ggplot(mask4_0.01, aes(x = as.factor(most_deleterious), fill = as.factor(most_deleterious))) + geom_bar(stat="count") + facet_wrap(~inlovo)
+
+ggplot(mask4_0.01, aes(x = AC, fill = as.factor(most_deleterious))) + geom_bar(stat="count") + facet_wrap(~inlovo)
+
+ggplot(mask4_0.01, aes(x = POS, y = 5, color = as.factor(inlovo))) + geom_point()
+
+ggplot(lovo, aes(x = variant, y = BETA)) + geom_point() + coord_flip()
 ```
 
