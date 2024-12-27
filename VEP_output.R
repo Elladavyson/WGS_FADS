@@ -31,7 +31,7 @@ if (!dir.exists(file_dir)) {
   message("File Directory already exists: ", file_dir)
 }
 
-sink(paste0(file_dir, gene, "_vepoutput.log"))
+sink(paste0(file_dir, gene, "_vepoutput_", Sys.Date(), ".log"))
 print(paste0("Results from this script saved to: ", file_dir))
   vep_consequence <- factor(c("transcript_ablation", "splice_acceptor_variant", "splice_donor_variant", 
   "stop_gained", "frameshift_variant", "stop_lost", "start_lost", "transcript_amplification", "feature_elongation", 
@@ -145,7 +145,7 @@ range = case_when(
 
 AC_counts_barplot <- ggplot(AC_counts, aes(x=range, y = n)) + 
   geom_bar(stat="identity", fill = "skyblue")+
-  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 2) + 
+  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 4) + 
   labs(x = "UKB Allele Count", y = "Count", title="UKB Allele Count (post-QC + rare variants)") + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
@@ -156,12 +156,15 @@ AC_counts_barplot
 dev.off()
 
 # What are the consequences annotated to the rare variants 
+custom_colors <- c("HIGH" = "red", "MODERATE" = "orange", "LOW" = "#90EE90", "MODIFIER" ="lightpink")
 csq_plot <- ggplot(annotated_rare, aes(x = reorder(Consequence, table(Consequence)[Consequence]), 
                                       fill = reorder(IMPACT, table(Consequence)[Consequence]))) +
   geom_bar(stat = 'count') + theme_bw() + 
  labs(x = "Consequence", y = "N", title = paste0(gene, " rare variant VEP Consequences"), fill = "VEP IMPACT") +
   coord_flip() + geom_text(stat = 'count', aes(label = after_stat(count)), hjust = -0.1) + 
-  theme(legend.position = "top")
+  theme(legend.position = "top") + scale_fill_manual(values = custom_colors)
+
+
 print(paste0("Saving plot of VEP consequences to: ", plot_dir, "CSQ_rare", gene, ".png"))
   png(paste0(plot_dir, "CSQ_rare", gene, ".png"), 
     width = 5000, height = 2000, res = 300, type = "cairo")
@@ -250,7 +253,7 @@ csq_pri_plot <- ggplot(priority, aes(x = reorder(Consequence, table(Consequence)
   geom_bar(stat = 'count') + theme_bw() + 
  labs(x = "Consequence", y = "N", title = paste0(gene, " prioritised variant VEP consequences"), fill = "VEP IMPACT") +
   coord_flip() + geom_text(stat = 'count', aes(label = after_stat(count)), hjust = -0.1) + 
-  theme(legend.position = "top")
+  theme(legend.position = "top") + scale_fill_manual(values = custom_colors)
 print(paste0("Saving plot of VEP consequences to: ", plot_dir, "CSQ_priority", gene, ".png"))
   png(paste0(plot_dir, "CSQ_priority", gene, ".png"), 
     width = 5000, height = 2000, res = 300, type = "cairo")
@@ -318,7 +321,7 @@ range = case_when(
 
 priority_AC_counts_barplot <- ggplot(priority_AC_counts, aes(x=range, y = n)) + 
   geom_bar(stat="identity", fill = "skyblue")+
-  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 2) + 
+  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 4) + 
   labs(x = "UKB Allele Count", y = "Count", title="UKB Allele Count (prioritised variants)") + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
