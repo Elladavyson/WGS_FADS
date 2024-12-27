@@ -135,17 +135,6 @@ participant_summary <- merge(participant_summary, gene_carrier, by = "SAMPLE")
     assign(paste0(gene, "_part_genotype"), participant_geno_merge)
 }
 
-print("Reading in MDD phenotype file")
-mdd <- read.table("ukb_unrel_eur_pgc3_mdd.pheno", header = T)
-print("Reading in the Metabolite phenotype file")
-metabol <- read.table("ukb_unrel_eur_metabol.pheno", header = T)
-print("The covariate file")
-covars <- read.table("ukb_unrel_eur_covars.covar", header = T)
-# Read in all cohort info 
-all <- read.csv("data_participant_all.csv")
-# colnames "eid" "p31"  "p34" "p22189" "p54_i0" "p21000_i0" "p21003_i0" "p21001_i0" "p20116_i0" "p6138_i0"  "p23449_i0" "p23444_i0" "p23450_i0" "p23457_i0" "p23459_i0" "p23443_i0"
-colnames(all) <- c("f.eid", "Sex", "yob", "TDI", "AC", "ethnicity", "Age","BMI", "smoking_stat", "qualifications", "f.23449.0.0", "f.23444.0.0", "f.23450.0.0", "f.23457.0.0", "f.23459.0.0", "f.23443.0.0")
-
 
 ###################################################################################
 
@@ -207,26 +196,45 @@ group_by(SAMPLE) %>%
 summarise(numgenes_carriers=sum(status=='carrier')) %>% pull(numgenes_carriers) %>% table() 
 
 ggsave(filename ="carrier_types_genes_permask_AF.png", carrier_types_plt_permask, width = 12, height = 6, device = "png", dpi = 300)
-ggsave(filename= "carrier_numbers_all.png", carrier_numbers_plt,width = 6, height = 6, device = "png", dpi = 300) 
+ggsave(filename= "carrier_numbers_all.png", carrier_numbers_plt,width = 6, height = 8, device = "png", dpi = 300) 
 
 ###############################################################################
  
 # Transforming (some) variables 
 
 ###############################################################################
+
+print("Reading in MDD phenotype file")
+mdd <- read.table("ukb_unrel_eur_pgc3_mdd.pheno", header = T)
+print("Reading in the Metabolite phenotype file")
+metabol <- read.table("ukb_unrel_eur_metabol.pheno", header = T)
+print("The covariate file")
+covars <- read.table("ukb_unrel_eur_covars.covar", header = T)
+# Read in all cohort info 
+all <- read.csv("data_participant_all.csv")
+colnames(all) <- c("f.eid", "Sex", "yob", "TDI", "AC", "ethnicity", "Age","BMI", "smoking_stat", "qualifications",
+ "f.23444.0.0", "f.23451.0.0", "f.23459.0.0", "f.23443.0.0", "f.23450.0.0",
+ "nmr_proc_batch","spectrometer", "nmr_shipment_plate",
+ paste0("PC", 1:20), "genotyping_array_batch"
+ )
 print(paste("Transforming the sex variable to Female = 0 and Male = 1",
 "Transforming the qualifications variable into University = 1 and no University = 0",
 "Collapsing the ethnicity categories into White background = 0, Mixed background = 1 and Other = 2",
-"Collapsing the genotype arrray to binary array based on batch numbers", collapse = '\n'))
+"Collapsing the genotype arrray to binary array based on batch numbers",
+"Transforming the genotype array variable to BiLEVE = 1 and Axiom = 0", collapse = '\n'))
 
 all <- all %>% 
   mutate(sex_coded = ifelse(Sex == "Female", 0, 1), 
          uni_nouni = ifelse(qualifications == 'College or University degree', 1, 0),
+         genotype_array = case_when(grepl("BiLEVE", genotyping_array_batch) ~ 1, 
+         grepl("Batch", genotyping_array_batch) ~ 0,
+         TRUE ~ NA_real_),
          ethnicity_collapsed = case_when(
            ethnicity %in% c('White', 'British','Irish','Any other white background') ~ 0, 
            ethnicity %in% c('Asian or Asian British', 'White and Black African', 'Any other mixed background', 'Mixed' , 'Black or Black British' , 'White and Black Caribbean', 'White and Asian') ~ 1,
            ethnicity %in% c('Chinese', 'Pakistani' , 'African' , 'Do not know' , 'Other ethnic group' , 'Indian' , 'Bangladeshi' , 'Caribbean' , 'Any other black background') ~ 2
          ))
+# Filter out missing values for MDD
 mdd <- mdd %>% filter(MajDepr != -9)
 all <- left_join(all, mdd, c("f.eid"= "IID"))
 
@@ -237,14 +245,25 @@ all <- left_join(all, mdd, c("f.eid"= "IID"))
 ################################################################################
 # Left join all the carrier status' to the demographic information
 
-all <- reduce(gene_carriers_list, function(x,y){
-    left_join(x,y, by = c("f.eid"="SAMPLE"))
-}, .init = all)
+# Mutate the dataframe to classify non-carriers across all the columns (not just a particular mask)
+# Define the mask columns
+mask_columns <- grep("Mask", names(gene_carriers_all), value = TRUE)
 
-summary_carrier_status <- function(carrier_dataframe, group_var) {
-    carrier_dataframe <- carrier_dataframe %>% filter(!is.na(!!sym(group_var)))
+# Apply the transformation
+gene_carriers_all <- gene_carriers_all %>%
+  mutate(across(
+    all_of(mask_columns), 
+    ~ ifelse(status == "non-carrier", "non_carrier_any", .)
+  ))
+
+# Merge the general carrier information with the demographics (i.e carrier/non_carrier)
+all <- left_join(all, gene_carriers_all, by = c("f.eid"="SAMPLE"))
+
+summary_carrier_status <- function(carrier_dataframe, gene) {
+  carrier_dataframe <- carrier_dataframe %>% filter(GENE == gene)
+    carrier_dataframe <- carrier_dataframe %>% filter(!is.na(status))
     carrier_summary <- carrier_dataframe %>% 
-    group_by(!!sym(group_var)) %>% 
+    group_by(status) %>% 
 summarise(mean_age = mean(Age, na.rm = T),
 sd_age = sd(Age, na.rm = TRUE),
 mean_bmi = mean(BMI, na.rm = T),
@@ -279,7 +298,7 @@ other_eth_stat = paste0(num_other_ethnicity, " (", signif((num_other_ethnicity/t
 mdd_cases_stat = paste0(num_mdd_cases, " (", signif((num_mdd_cases/total)*100,3), "%)"),
 mdd_controls_stat = paste0(num_mdd_controls, " (", signif((num_mdd_controls/total)*100,3), "%)")
 ) %>% 
-select(!!sym(group_var), total, ends_with("stat")) %>% 
+select(status, total, ends_with("stat")) %>% 
 as.data.frame()
 return(carrier_summary)
 }
@@ -288,7 +307,7 @@ genes <- fads_genes$hgnc_symbol
 # Use lapply to apply summary_carrier_status() to each gene
 lapply(genes, function(gene) {
     # Create the summary for the gene
-    carrier_summary <- summary_carrier_status(all, paste0(gene, "_status"))
+    carrier_summary <- summary_carrier_status(all, gene)
     
     # Write the summary to a .tsv file
     write.table(carrier_summary, 
@@ -302,12 +321,13 @@ lapply(genes, function(gene) {
 
 ################################################################################
 
-# Chi Squared test of proportions
+# Chi Squared test of proportions (now not needed as have run REGENIE instead)
 
 ################################################################################
 
 chi_test <- function(df, gene) {
-    table <- table(df[,"MajDepr"], df[, paste0(gene, "_status")])
+    df <- df %>% filter(GENE == gene)
+    table <- table(df[,"MajDepr"], df[, "status"])
     rownames(table) <- c("Controls", "Cases")
     chisq <- chisq.test(table)
     return(chisq)
@@ -357,27 +377,7 @@ write.table(combined_chi_values, "all_carriers_mdd_chisq_exp_obs.tsv", sep = "\t
 
 ################################################################################
 
-# Read in metabolite cohort info 
-metabolite_baseline <- read.csv("data_participant_metabolomics.csv")
-# Colnames (some reason are not the same order as the all cohort - be careful 
-# "eid" "p31" "p34" "p22189" "p54_i0" "p21000_i0" "p21003_i0" "p21001_i0" "p20116_i0" "p6138_i0"  "p23443_i0" "p23450_i0" "p23444_i0" "p23451_i0" "p23459_i0"
-colnames(metabolite_baseline) <- c("f.eid","Sex", "yob", "TDI", "AC", "ethnicity", "Age", "BMI", "smoking_stat", "qualifications",  "f.23443.0.0", "f.23450.0.0", "f.23444.0.0", "f.23451.0.0", "f.23459.0.0")
-## Metabolites included are those with significant MR results (DHA the one with MR and colocalisation results)
-# f.23443- Degree of Unsaturation
-# f.23450 DHA
-# f.23444 Omega-3 Fatty Acids
-# f.23451 Omega-3 Fatty Acids to TFA
-# f.23459 Omega-6 Fatty Acids to Omega-3 Fatty Acids ratio
-
-metabolite_baseline <- metabolite_baseline %>% 
-  mutate(sex_coded = ifelse(Sex == "Female", 0, 1), 
-         uni_nouni = ifelse(qualifications == 'College or University degree', 1, 0),
-         ethnicity_collapsed = case_when(
-           ethnicity %in% c('White', 'British','Irish','Any other white background') ~ 0, 
-           ethnicity %in% c('Asian or Asian British', 'White and Black African', 'Any other mixed background', 'Mixed' , 'Black or Black British' , 'White and Black Caribbean', 'White and Asian') ~ 1,
-           ethnicity %in% c('Chinese', 'Pakistani' , 'African' , 'Do not know' , 'Other ethnic group' , 'Indian' , 'Bangladeshi' , 'Caribbean' , 'Any other black background') ~ 2
-         ))
-
+metabolite_baseline <- all %>% filter(spectrometer != "")
 
 ###################################################################################
 
@@ -387,7 +387,6 @@ metabolite_baseline <- metabolite_baseline %>%
 
 # Metabolite measures names 
 nmr_info$matchingmet <- paste('f.', nmr_info$UKB.Field.ID, '.0.0', sep = "")
-
 
 #### functions to get the metabolite name or the short version of the metabolite name ####
 
@@ -413,6 +412,7 @@ get_metaboliteshort <- function(ID_vector) {
 
 # Plot the distributions of the metabolite measures 
 meta_measures <- metabolite_baseline %>% 
+distinct(f.eid, .keep_all=TRUE) %>%
 select(starts_with("f.")) %>% 
 rename("Degree of Unsaturation"="f.23443.0.0",
 "Docosahexaenoic Acid" = "f.23450.0.0",
@@ -422,10 +422,12 @@ rename("Degree of Unsaturation"="f.23443.0.0",
 ) %>% 
 pivot_longer(., cols = -c("f.eid"), names_to=c("Metabolite"), values_to=c("Value"))
 
+
 raw_meta_plt <- ggplot(meta_measures, aes(x = Value)) + geom_histogram() +
 facet_wrap(~Metabolite) + 
 theme_minimal() + 
-labs(x = "Raw Metabolite Value", y = "Count", title = paste0("All participants with NMR data: n = ", nrow(metabolite_baseline)))
+labs(x = "Raw Metabolite Value", y = "Count", title = paste0("All participants with NMR data: n = ", nrow(metabolite_baseline %>% 
+distinct(f.eid, .keep_all=TRUE) )))
 
 ggsave(filename ="raw_metabolite_hists.png", raw_meta_plt, width = 10, height = 6, device = "png", dpi = 300)
 
@@ -439,6 +441,7 @@ f.23451.0.0 = orderNorm(f.23451.0.0)$x.t,
 f.23459.0.0 = orderNorm(f.23459.0.0)$x.t)
 
 norm_meta_measures <- norm_metabolite_baseline %>% 
+distinct(f.eid, .keep_all=TRUE) %>%
 select(starts_with("f.")) %>% 
 rename("Degree of Unsaturation"="f.23443.0.0",
 "Docosahexaenoic Acid" = "f.23450.0.0",
@@ -451,7 +454,8 @@ pivot_longer(., cols = -c("f.eid"), names_to=c("Metabolite"), values_to=c("Value
 norm_meta_plt <- ggplot(norm_meta_measures, aes(x = Value)) + geom_histogram() +
 facet_wrap(~Metabolite) + 
 theme_minimal() + 
-labs(x = "Normalised Metabolite Value", y = "Count", title = paste0("All participants with NMR data: n = ", nrow(metabolite_baseline)))
+labs(x = "Normalised Metabolite Value", y = "Count", title = paste0("All participants with NMR data: n = ", nrow(metabolite_baseline %>% 
+distinct(f.eid, .keep_all=TRUE))))
 
 ggsave(filename ="norm_metabolite_hists.png", norm_meta_plt, width = 10, height = 6, device = "png", dpi = 300)
 
