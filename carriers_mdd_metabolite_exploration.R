@@ -9,6 +9,8 @@ library(ggplot2)
 library(Hmisc) # Have to install
 library(ggpubr) # Have to install 
 library(ggsignif) # Have to install 
+library(UpSetR) # Have to install 
+library(caret)
 
 # dx download /Output/genotypes/genotype_summary/all_priority/*_carrier_info.tsv
 # dx download /Output/genotypes/genotype_summary/all_priority/*_participant_var_summary.tsv
@@ -191,9 +193,28 @@ theme_minimal() +
 labs(x = "", y = "Count", fill = "") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
 
 # Carriers of pathogenic in various different genes (?)
-gene_carriers_all %>% 
+# UpSet Plot of all the carriers 
+carriers_across_genes <- list()
+
+gene_carriers_summ <- gene_carriers_all %>% 
 group_by(SAMPLE) %>% 
-summarise(numgenes_carriers=sum(status=='carrier')) %>% pull(numgenes_carriers) %>% table() 
+summarise(numgenes_carriers=sum(status=='carrier'),
+gene_carriers = paste(GENE[status=="carrier"], collapse = ",")) 
+# List of genes to check
+genes <- c("FADS1", "FADS2", "FADS3", "FEN1", "MYRF", "TMEM258")
+# Create columns dynamically for each gene
+carriers_across_genes <- genes %>%
+  set_names() %>%
+  map(~ gene_carriers_summ %>%
+        filter(grepl(.x, gene_carriers)) %>%
+        pull(SAMPLE))
+upset_plt <- upset(fromList(carriers_across_genes), nsets = length(carriers_across_genes), set_size.show = TRUE, order.by = 'freq')
+
+# Plot the Upset Plot
+png(paste0("UpSet_privar_carriers_genes.png"), 
+    width = 3200, height = 2000, res = 300, type = "cairo")
+upset_plt
+dev.off()
 
 ggsave(filename ="carrier_types_genes_permask_AF.png", carrier_types_plt_permask, width = 12, height = 6, device = "png", dpi = 300)
 ggsave(filename= "carrier_numbers_all.png", carrier_numbers_plt,width = 6, height = 8, device = "png", dpi = 300) 
@@ -324,13 +345,93 @@ lapply(genes, function(gene) {
 # Chi Squared test of proportions (now not needed as have run REGENIE instead)
 
 ################################################################################
+all <- all %>%
+  mutate(across(
+    all_of(mask_columns), 
+    ~ ifelse(. == "non_carrier_any", "non-carrier", .)
+  ))
+
+extract_chi_res <- function(chi_res, gene, mask) {
+    statistic <- chi_res$statistic
+    df <- chi_res$statistic
+    p <- chi_res$p.value
+    method <- chi_res$method
+    df <- data.frame(gene=gene, mask=mask, statistic=statistic, df=df, p=p, method = method)
+    row.names(df) <- ""
+    return(df)
+}
+
+extract_chi_values <- function(chi_res, gene){
+    observed <- chi_res$observed
+    expected <- chi_res$expected
+    num_rows <- nrow(observed)
+    num_columns <- ncol(observed)
+    print(num_rows)
+    print(num_columns)
+    chi_values_df <- data.frame(gene = rep(gene,4),
+    MDD_status=rep(rownames(observed),2),
+    Carrier_status= c(rep("Carrier",2 ), rep("Non-carrier",2)),
+    observed = as.vector(observed),
+    expected = as.vector(expected))
+    return(chi_values_df)
+}
+
 
 chi_test <- function(df, gene) {
-    df <- df %>% filter(GENE == gene)
-    table <- table(df[,"MajDepr"], df[, "status"])
-    rownames(table) <- c("Controls", "Cases")
-    chisq <- chisq.test(table)
-    return(chisq)
+  # Filter data for the given gene
+  df <- df %>% filter(GENE == gene)
+table_Mask1.0.01 <- table(df[,"MajDepr"], df[, "Mask1.0.01_status"])
+    table_Mask2.0.01 <- table(df[,"MajDepr"], df[, "Mask2.0.01_status"])
+    table_Mask3.0.01 <- table(df[,"MajDepr"], df[, "Mask3.0.01_status"])
+    table_Mask4.0.01 <- table(df[,"MajDepr"], df[, "Mask4.0.01_status"])
+    table_Mask5.0.01 <- table(df[,"MajDepr"], df[, "Mask5.0.01_status"])
+    table_Mask1.singleton <- table(df[,"MajDepr"], df[, "Mask1.singleton_status"])
+    table_Mask2.singleton <- table(df[,"MajDepr"], df[, "Mask2.singleton_status"])
+    table_Mask3.singleton <- table(df[,"MajDepr"], df[, "Mask3.singleton_status"])
+    table_Mask4.singleton <- table(df[,"MajDepr"], df[, "Mask4.singleton_status"])
+    table_Mask5.singleton <- table(df[,"MajDepr"], df[, "Mask5.singleton_status"])
+    rownames(table_Mask1.0.01) <- c("Controls", "Cases")
+    rownames(table_Mask2.0.01) <- c("Controls", "Cases")
+    rownames(table_Mask3.0.01) <- c("Controls", "Cases")
+    rownames(table_Mask4.0.01) <- c("Controls", "Cases")
+    rownames(table_Mask5.0.01) <- c("Controls", "Cases")
+    rownames(table_Mask1.singleton) <- c("Controls", "Cases")
+    rownames(table_Mask2.singleton) <- c("Controls", "Cases")
+    rownames(table_Mask3.singleton) <- c("Controls", "Cases")
+    rownames(table_Mask4.singleton) <- c("Controls", "Cases")
+    rownames(table_Mask5.singleton) <- c("Controls", "Cases")
+    chisq_Mask1_0.01 <- chisq.test(table_Mask1.0.01)
+    chisq_Mask2_0.01 <- chisq.test(table_Mask2.0.01)
+    chisq_Mask3_0.01 <- chisq.test(table_Mask3.0.01)
+    chisq_Mask4_0.01 <- chisq.test(table_Mask4.0.01)
+    chisq_Mask5_0.01 <- chisq.test(table_Mask5.0.01)
+    chisq_Mask1_singleton <- chisq.test(table_Mask1.singleton)
+    chisq_Mask2_singleton <- chisq.test(table_Mask2.singleton)
+    chisq_Mask3_singleton <- chisq.test(table_Mask3.singleton)
+    chisq_Mask4_singleton <- chisq.test(table_Mask4.singleton)
+    chisq_Mask5_singleton <- chisq.test(table_Mask5.singleton)
+    chi_results_all_masks <- rbind(extract_chi_res(chisq_Mask1_0.01, gene, "Mask1.0.01"), 
+    extract_chi_res(chisq_Mask2_0.01, gene, "Mask2.0.01"),
+    extract_chi_res(chisq_Mask3_0.01, gene, "Mask3.0.01"),
+    extract_chi_res(chisq_Mask4_0.01, gene, "Mask4.0.01"),
+    extract_chi_res(chisq_Mask5_0.01, gene, "Mask5.0.01"),
+    extract_chi_res(chisq_Mask1_singleton, gene, "Mask1.singleton"), 
+    extract_chi_res(chisq_Mask2_singleton, gene, "Mask2.singleton"),
+    extract_chi_res(chisq_Mask3_singleton, gene, "Mask3.singleton"),
+    extract_chi_res(chisq_Mask4_singleton, gene, "Mask4.singleton"),
+    extract_chi_res(chisq_Mask5_singleton, gene, "Mask5.singleton"))
+    chi_res_values_all <- rbind(extract_chi_values(chisq_Mask1_0.01, gene),
+extract_chi_values(chisq_Mask2_0.01, gene),
+extract_chi_values(chisq_Mask3_0.01, gene),
+extract_chi_values(chisq_Mask4_0.01, gene),
+extract_chi_values(chisq_Mask5_0.01, gene),
+extract_chi_values(chisq_Mask1_singleton, gene),
+extract_chi_values(chisq_Mask2_singleton, gene),
+extract_chi_values(chisq_Mask3_singleton, gene),
+extract_chi_values(chisq_Mask4_singleton, gene),
+extract_chi_values(chisq_Mask5_singleton, gene))
+
+    return(list(chi_results_all_masks, chi_res_values_all))
 }
 
 FEN1_chires <- chi_test(all, "FEN1")
@@ -339,16 +440,6 @@ FADS2_chires <- chi_test(all, "FADS2")
 FADS3_chires <- chi_test(all, "FADS3")
 MYRF_chires <- chi_test(all, "MYRF")
 TMEM258_chires <- chi_test(all, "TMEM258")
-
-extract_chi_res <- function(chi_res, gene) {
-    statistic <- chi_res$statistic
-    df <- chi_res$statistic
-    p <- chi_res$p.value
-    method <- chi_res$method
-    df <- data.frame(gene=gene, statistic=statistic, df=df, p=p, method = method)
-    row.names(df) <- ""
-    return(df)
-}
 
 chi_results_all <- rbind(extract_chi_res(FEN1_chires, "FEN1"), extract_chi_res(FADS1_chires, "FADS1"), extract_chi_res(FADS2_chires, "FADS2"),
 extract_chi_res(FADS3_chires, "FADS3"), extract_chi_res(MYRF_chires, "MYRF"), extract_chi_res(TMEM258_chires, "TMEM258"))
@@ -371,6 +462,35 @@ write.table(chi_results_all, "all_carriers_mdd_chisq_results.tsv", sep = "\t", r
 write.table(combined_chi_values, "all_carriers_mdd_chisq_exp_obs.tsv", sep = "\t", row.names = F, quote = F)
 
 ###############################################################################
+
+# Confusion matrices for each Mask and MDD 
+
+###############################################################################
+
+# Plot the confusion matrices between the carriers of a particular mask and non-carriers of that particular mask (these non carriers could be carriers of prioritised variants in another mask)
+all <- all %>%
+  mutate(across(
+    all_of(mask_columns), 
+    ~ ifelse(. == "non_carrier_any", "none-carrier", .)
+  ))
+
+mask <- all %>% filter(GENE=="FADS1") %>% filter(Mask1.0.01_status != "non-carrier")
+table(mask$Mask1.0.01_status, mask$MajDepr)
+
+
+# Plot the confusion matrices between the carriers of a particular mask and non-carriers of ANY prioritised variant in ANY mask
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Summary of the carriers vs non carriers in baseline demographic variables 
 # In those with metabolomic data at instance 0 
