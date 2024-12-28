@@ -351,87 +351,78 @@ all <- all %>%
     ~ ifelse(. == "non_carrier_any", "non-carrier", .)
   ))
 
+# Extract Chi-square results
 extract_chi_res <- function(chi_res, gene, mask) {
     statistic <- chi_res$statistic
-    df <- chi_res$statistic
+    df <- chi_res$parameter  # Degrees of freedom
     p <- chi_res$p.value
     method <- chi_res$method
-    df <- data.frame(gene=gene, mask=mask, statistic=statistic, df=df, p=p, method = method)
-    row.names(df) <- ""
+    df <- data.frame(gene=gene, mask=mask, statistic=statistic, df=df, p=p, method=method)
+    rownames(df) <- NULL
     return(df)
 }
 
+# Extract observed and expected values from Chi-square test
 extract_chi_values <- function(chi_res, gene){
     observed <- chi_res$observed
     expected <- chi_res$expected
     num_rows <- nrow(observed)
     num_columns <- ncol(observed)
-    print(num_rows)
-    print(num_columns)
-    chi_values_df <- data.frame(gene = rep(gene,4),
-    MDD_status=rep(rownames(observed),2),
-    Carrier_status= c(rep("Carrier",2 ), rep("Non-carrier",2)),
-    observed = as.vector(observed),
-    expected = as.vector(expected))
+    
+    MDD_status <- rep(rownames(observed), each = num_columns)
+    Carrier_status <- rep(colnames(observed), num_rows)
+    
+    chi_values_df <- data.frame(
+        gene = rep(gene, num_rows * num_columns),
+        MDD_status = MDD_status,
+        Carrier_status = Carrier_status,
+        observed = as.vector(observed),
+        expected = as.vector(expected)
+    )
     return(chi_values_df)
 }
 
-
+# Main chi-square test function
 chi_test <- function(df, gene) {
   # Filter data for the given gene
   df <- df %>% filter(GENE == gene)
-table_Mask1.0.01 <- table(df[,"MajDepr"], df[, "Mask1.0.01_status"])
-    table_Mask2.0.01 <- table(df[,"MajDepr"], df[, "Mask2.0.01_status"])
-    table_Mask3.0.01 <- table(df[,"MajDepr"], df[, "Mask3.0.01_status"])
-    table_Mask4.0.01 <- table(df[,"MajDepr"], df[, "Mask4.0.01_status"])
-    table_Mask5.0.01 <- table(df[,"MajDepr"], df[, "Mask5.0.01_status"])
-    table_Mask1.singleton <- table(df[,"MajDepr"], df[, "Mask1.singleton_status"])
-    table_Mask2.singleton <- table(df[,"MajDepr"], df[, "Mask2.singleton_status"])
-    table_Mask3.singleton <- table(df[,"MajDepr"], df[, "Mask3.singleton_status"])
-    table_Mask4.singleton <- table(df[,"MajDepr"], df[, "Mask4.singleton_status"])
-    table_Mask5.singleton <- table(df[,"MajDepr"], df[, "Mask5.singleton_status"])
-    rownames(table_Mask1.0.01) <- c("Controls", "Cases")
-    rownames(table_Mask2.0.01) <- c("Controls", "Cases")
-    rownames(table_Mask3.0.01) <- c("Controls", "Cases")
-    rownames(table_Mask4.0.01) <- c("Controls", "Cases")
-    rownames(table_Mask5.0.01) <- c("Controls", "Cases")
-    rownames(table_Mask1.singleton) <- c("Controls", "Cases")
-    rownames(table_Mask2.singleton) <- c("Controls", "Cases")
-    rownames(table_Mask3.singleton) <- c("Controls", "Cases")
-    rownames(table_Mask4.singleton) <- c("Controls", "Cases")
-    rownames(table_Mask5.singleton) <- c("Controls", "Cases")
-    chisq_Mask1_0.01 <- chisq.test(table_Mask1.0.01)
-    chisq_Mask2_0.01 <- chisq.test(table_Mask2.0.01)
-    chisq_Mask3_0.01 <- chisq.test(table_Mask3.0.01)
-    chisq_Mask4_0.01 <- chisq.test(table_Mask4.0.01)
-    chisq_Mask5_0.01 <- chisq.test(table_Mask5.0.01)
-    chisq_Mask1_singleton <- chisq.test(table_Mask1.singleton)
-    chisq_Mask2_singleton <- chisq.test(table_Mask2.singleton)
-    chisq_Mask3_singleton <- chisq.test(table_Mask3.singleton)
-    chisq_Mask4_singleton <- chisq.test(table_Mask4.singleton)
-    chisq_Mask5_singleton <- chisq.test(table_Mask5.singleton)
-    chi_results_all_masks <- rbind(extract_chi_res(chisq_Mask1_0.01, gene, "Mask1.0.01"), 
-    extract_chi_res(chisq_Mask2_0.01, gene, "Mask2.0.01"),
-    extract_chi_res(chisq_Mask3_0.01, gene, "Mask3.0.01"),
-    extract_chi_res(chisq_Mask4_0.01, gene, "Mask4.0.01"),
-    extract_chi_res(chisq_Mask5_0.01, gene, "Mask5.0.01"),
-    extract_chi_res(chisq_Mask1_singleton, gene, "Mask1.singleton"), 
-    extract_chi_res(chisq_Mask2_singleton, gene, "Mask2.singleton"),
-    extract_chi_res(chisq_Mask3_singleton, gene, "Mask3.singleton"),
-    extract_chi_res(chisq_Mask4_singleton, gene, "Mask4.singleton"),
-    extract_chi_res(chisq_Mask5_singleton, gene, "Mask5.singleton"))
-    chi_res_values_all <- rbind(extract_chi_values(chisq_Mask1_0.01, gene),
-extract_chi_values(chisq_Mask2_0.01, gene),
-extract_chi_values(chisq_Mask3_0.01, gene),
-extract_chi_values(chisq_Mask4_0.01, gene),
-extract_chi_values(chisq_Mask5_0.01, gene),
-extract_chi_values(chisq_Mask1_singleton, gene),
-extract_chi_values(chisq_Mask2_singleton, gene),
-extract_chi_values(chisq_Mask3_singleton, gene),
-extract_chi_values(chisq_Mask4_singleton, gene),
-extract_chi_values(chisq_Mask5_singleton, gene))
+  
+  # Define masks
+  masks <- c(
+    "Mask1.0.01_status", "Mask2.0.01_status", "Mask3.0.01_status", "Mask4.0.01_status", "Mask5.0.01_status",
+    "Mask1.singleton_status", "Mask2.singleton_status", "Mask3.singleton_status", "Mask4.singleton_status", "Mask5.singleton_status"
+  )
 
-    return(list(chi_results_all_masks, chi_res_values_all))
+  # Function to process each mask
+  process_mask <- function(mask) {
+    # Create contingency table
+    table_data <- table(df[["MajDepr"]], df[[mask]])
+    
+    # Ensure the table has valid dimensions and perform chi-squared test
+    if (all(dim(table_data) > 0)) {
+      rownames(table_data) <- c("Controls", "Cases")
+      chi_result <- chisq.test(table_data)
+      
+      # Extract results
+      chi_res <- extract_chi_res(chi_result, gene, mask)
+      chi_values <- extract_chi_values(chi_result, gene)
+      
+      return(list(chi_res, chi_values))
+    } else {
+      # Return empty results if no valid data
+      return(list(data.frame(gene = gene, mask = mask, p_value = NA, chi_squared = NA), 
+                  data.frame(gene = gene, MDD_status = NA, Carrier_status = NA, observed = NA, expected = NA)))
+    }
+  }
+  
+  # Apply function to all masks and combine results
+  results <- lapply(masks, process_mask)
+  
+  # Combine chi results and chi values for all masks
+  chi_results_all_masks <- do.call(rbind, lapply(results, function(x) x[[1]]))
+  chi_res_values_all <- do.call(rbind, lapply(results, function(x) x[[2]]))
+  
+  return(list(chi_results_all_masks, chi_res_values_all))
 }
 
 FEN1_chires <- chi_test(all, "FEN1")
