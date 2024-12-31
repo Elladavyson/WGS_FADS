@@ -10,7 +10,7 @@ library(Hmisc) # Have to install
 library(ggpubr) # Have to install 
 library(ggsignif) # Have to install 
 library(UpSetR) # Have to install 
-library(caret)
+library(caret) # Have to install
 
 # dx download /Output/genotypes/genotype_summary/all_priority/*_carrier_info.tsv
 # dx download /Output/genotypes/genotype_summary/all_priority/*_participant_var_summary.tsv
@@ -73,11 +73,11 @@ for (i in 1:nrow(fads_genes)){
     Mask4.0.01_status = ifelse(annotation == "LoF" | annotation == "H_IMPACT" | annotation == "REVEL" | annotation == "CADD", "carrier", "non-carrier"),
     Mask5.0.01_status = ifelse(annotation == "LoF" | annotation == "H_IMPACT" | annotation == "REVEL" | annotation == "CADD" | annotation == "MOD_IMPACT", "carrier", "non-carrier")
     ) %>% 
-    mutate(Mask1.singleton_status = ifelse(Mask1.0.01_status == "carrier" & singleton == 1, "carrier", "non_carrier"),
-Mask2.singleton_status = ifelse(Mask2.0.01_status == "carrier" & singleton == 1, "carrier", "non_carrier"),
-Mask3.singleton_status = ifelse(Mask3.0.01_status == "carrier" & singleton == 1, "carrier", "non_carrier"),
-Mask4.singleton_status = ifelse(Mask4.0.01_status == "carrier" & singleton == 1, "carrier", "non_carrier"),
-Mask5.singleton_status = ifelse(Mask5.0.01_status == "carrier" & singleton == 1, "carrier", "non_carrier"),
+    mutate(Mask1.singleton_status = ifelse(Mask1.0.01_status == "carrier" & singleton == 1, "carrier", "non-carrier"),
+Mask2.singleton_status = ifelse(Mask2.0.01_status == "carrier" & singleton == 1, "carrier", "non-carrier"),
+Mask3.singleton_status = ifelse(Mask3.0.01_status == "carrier" & singleton == 1, "carrier", "non-carrier"),
+Mask4.singleton_status = ifelse(Mask4.0.01_status == "carrier" & singleton == 1, "carrier", "non-carrier"),
+Mask5.singleton_status = ifelse(Mask5.0.01_status == "carrier" & singleton == 1, "carrier", "non-carrier"),
     )
     participant_geno_all <- participant_genotype %>% select(SAMPLE, starts_with("Mask")) 
    # For carriers of multiple varaints, ensure no duplications and they are marked as a carrier of the most deleterious variant (i.e the smallest mask)
@@ -184,6 +184,12 @@ carrier_types_plt_permask <- ggplot(part_carriers_summary %>% filter(Carrier_sta
         axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position="top")
 
+carrier_summary_all_long <- gene_carriers_all %>% 
+pivot_longer(cols = starts_with('Mask'),
+names_to="Mask",
+values_to = "Carrier_status")  %>%
+mutate(Mask = gsub("_status", "", Mask))
+
 # Establish the number of non carriers for each gene (static)
 # The number of carriers (total), the other graph goes into more detail as to which carrier is which 
 carrier_numbers_plt <- ggplot(gene_carriers_all, aes(x= "status", fill=status)) + 
@@ -191,6 +197,13 @@ geom_bar(stat="count", position = "dodge") +
 geom_text(stat = "count", aes(label = after_stat(count), color = status), position = position_dodge(width = 0.8), vjust = -0.5, size = 3, show.legend = FALSE) +
 theme_minimal() + 
 labs(x = "", y = "Count", fill = "") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
+
+carrier_numbers_permask <- ggplot(carrier_summary_all_long, aes(x= Mask, fill=Carrier_status)) + 
+    geom_bar(stat="count", position = "dodge") + 
+    geom_text(stat = "count", aes(label = after_stat(count), color = Carrier_status), position = position_dodge(width = 0.8), vjust = -0.5, size = 2, show.legend = FALSE) +
+    theme_minimal() + 
+    labs(x = "", y = "Count", fill = "") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)+theme(
+        axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Carriers of pathogenic in various different genes (?)
 # UpSet Plot of all the carriers 
@@ -218,6 +231,7 @@ dev.off()
 
 ggsave(filename ="carrier_types_genes_permask_AF.png", carrier_types_plt_permask, width = 12, height = 6, device = "png", dpi = 300)
 ggsave(filename= "carrier_numbers_all.png", carrier_numbers_plt,width = 6, height = 8, device = "png", dpi = 300) 
+ggsave(filename="carrier_numbers_permask.png", carrier_numbers_permask, width = 10, height = 8, device = "png", dpi = 300)
 
 ###############################################################################
  
@@ -278,7 +292,7 @@ gene_carriers_all <- gene_carriers_all %>%
   ))
 
 # Merge the general carrier information with the demographics (i.e carrier/non_carrier)
-all <- left_join(all, gene_carriers_all, by = c("f.eid"="SAMPLE"))
+all_gene_carriers <- left_join(all, gene_carriers_all, by = c("f.eid"="SAMPLE"))
 
 summary_carrier_status <- function(carrier_dataframe, gene) {
   carrier_dataframe <- carrier_dataframe %>% filter(GENE == gene)
@@ -328,7 +342,7 @@ genes <- fads_genes$hgnc_symbol
 # Use lapply to apply summary_carrier_status() to each gene
 lapply(genes, function(gene) {
     # Create the summary for the gene
-    carrier_summary <- summary_carrier_status(all, gene)
+    carrier_summary <- summary_carrier_status(all_gene_carriers, gene)
     
     # Write the summary to a .tsv file
     write.table(carrier_summary, 
@@ -345,7 +359,7 @@ lapply(genes, function(gene) {
 # Chi Squared test of proportions (now not needed as have run REGENIE instead)
 
 ################################################################################
-all <- all %>%
+all_gene_carriers <- all_gene_carriers %>%
   mutate(across(
     all_of(mask_columns), 
     ~ ifelse(. == "non_carrier_any", "non-carrier", .)
@@ -354,31 +368,23 @@ all <- all %>%
 # Extract Chi-square results
 extract_chi_res <- function(chi_res, gene, mask) {
     statistic <- chi_res$statistic
-    df <- chi_res$parameter  # Degrees of freedom
+    df <- chi_res$statistic
     p <- chi_res$p.value
     method <- chi_res$method
-    df <- data.frame(gene=gene, mask=mask, statistic=statistic, df=df, p=p, method=method)
-    rownames(df) <- NULL
+    df <- data.frame(gene=gene, mask=mask, statistic=statistic, df=df, p=p, method = method)
+    row.names(df) <- ""
     return(df)
 }
-
 # Extract observed and expected values from Chi-square test
-extract_chi_values <- function(chi_res, gene){
+extract_chi_values <- function(chi_res, gene, mask){
     observed <- chi_res$observed
     expected <- chi_res$expected
-    num_rows <- nrow(observed)
-    num_columns <- ncol(observed)
-    
-    MDD_status <- rep(rownames(observed), each = num_columns)
-    Carrier_status <- rep(colnames(observed), num_rows)
-    
-    chi_values_df <- data.frame(
-        gene = rep(gene, num_rows * num_columns),
-        MDD_status = MDD_status,
-        Carrier_status = Carrier_status,
-        observed = as.vector(observed),
-        expected = as.vector(expected)
-    )
+    chi_values_df <- data.frame(gene = rep(gene,4),
+    mask = rep(mask, 4),
+    MDD_status=rep(rownames(observed),2),
+    Carrier_status= c(rep("Carrier",2 ), rep("Non-carrier",2)),
+    observed = as.vector(observed),
+    expected = as.vector(expected))
     return(chi_values_df)
 }
 
@@ -387,70 +393,58 @@ chi_test <- function(df, gene) {
   # Filter data for the given gene
   df <- df %>% filter(GENE == gene)
   
-  # Define masks
-  masks <- c(
-    "Mask1.0.01_status", "Mask2.0.01_status", "Mask3.0.01_status", "Mask4.0.01_status", "Mask5.0.01_status",
-    "Mask1.singleton_status", "Mask2.singleton_status", "Mask3.singleton_status", "Mask4.singleton_status", "Mask5.singleton_status"
-  )
-
-  # Function to process each mask
-  process_mask <- function(mask) {
-    # Create contingency table
-    table_data <- table(df[["MajDepr"]], df[[mask]])
-    
-    # Ensure the table has valid dimensions and perform chi-squared test
-    if (all(dim(table_data) > 0)) {
-      rownames(table_data) <- c("Controls", "Cases")
-      chi_result <- chisq.test(table_data)
-      
-      # Extract results
-      chi_res <- extract_chi_res(chi_result, gene, mask)
-      chi_values <- extract_chi_values(chi_result, gene)
-      
-      return(list(chi_res, chi_values))
-    } else {
-      # Return empty results if no valid data
-      return(list(data.frame(gene = gene, mask = mask, p_value = NA, chi_squared = NA), 
-                  data.frame(gene = gene, MDD_status = NA, Carrier_status = NA, observed = NA, expected = NA)))
-    }
+  # Define the masks to process
+  masks <- c("Mask2.0.01", "Mask3.0.01", "Mask4.0.01", "Mask5.0.01")
+  singleton_masks <- c("Mask2.singleton", "Mask3.singleton", "Mask4.singleton", "Mask5.singleton")
+  
+  # Include Mask1 only if gene is not FEN1
+  if (gene != "FEN1") {
+    masks <- c("Mask1.0.01", masks)
+    singleton_masks <- c("Mask1.singleton", singleton_masks)
   }
   
-  # Apply function to all masks and combine results
-  results <- lapply(masks, process_mask)
+  # Helper function to create tables, run chi-sq tests, and extract results
+  process_masks <- function(mask_list, prefix) {
+    results <- lapply(mask_list, function(mask) {
+      table_data <- table(df[,"MajDepr"], df[[paste0(mask, "_status")]])
+      rownames(table_data) <- c("Controls", "Cases")
+      chi_test <- chisq.test(table_data)
+      
+      list(
+        res = extract_chi_res(chi_test, gene, paste0(prefix, mask)),
+        values = extract_chi_values(chi_test, gene, paste0(prefix, mask))
+      )
+    })
+    results
+  }
   
-  # Combine chi results and chi values for all masks
-  chi_results_all_masks <- do.call(rbind, lapply(results, function(x) x[[1]]))
-  chi_res_values_all <- do.call(rbind, lapply(results, function(x) x[[2]]))
+  # Process both sets of masks
+  chi_mask_results <- process_masks(masks, "")
+  chi_singleton_results <- process_masks(singleton_masks, "")
+  
+  # Combine all results
+  chi_results_all_masks <- do.call(rbind, lapply(chi_mask_results, `[[`, "res"))
+  chi_results_all_masks <- rbind(chi_results_all_masks, do.call(rbind, lapply(chi_singleton_results, `[[`, "res")))
+  
+  chi_res_values_all <- do.call(rbind, lapply(chi_mask_results, `[[`, "values"))
+  chi_res_values_all <- rbind(chi_res_values_all, do.call(rbind, lapply(chi_singleton_results, `[[`, "values")))
   
   return(list(chi_results_all_masks, chi_res_values_all))
 }
 
-FEN1_chires <- chi_test(all, "FEN1")
-FADS1_chires <- chi_test(all, "FADS1")
-FADS2_chires <- chi_test(all, "FADS2")
-FADS3_chires <- chi_test(all, "FADS3")
-MYRF_chires <- chi_test(all, "MYRF")
-TMEM258_chires <- chi_test(all, "TMEM258")
 
-chi_results_all <- rbind(extract_chi_res(FEN1_chires, "FEN1"), extract_chi_res(FADS1_chires, "FADS1"), extract_chi_res(FADS2_chires, "FADS2"),
-extract_chi_res(FADS3_chires, "FADS3"), extract_chi_res(MYRF_chires, "MYRF"), extract_chi_res(TMEM258_chires, "TMEM258"))
+FEN1_chires <- chi_test(all_gene_carriers, "FEN1")
+FADS1_chires <- chi_test(all_gene_carriers, "FADS1")
+FADS2_chires <- chi_test(all_gene_carriers, "FADS2")
+FADS3_chires <- chi_test(all_gene_carriers, "FADS3")
+MYRF_chires <- chi_test(all_gene_carriers, "MYRF")
+TMEM258_chires <- chi_test(all_gene_carriers, "TMEM258")
 
-chi_res_list <- list(FEN1_chires, FADS1_chires, FADS2_chires, FADS3_chires, MYRF_chires, TMEM258_chires)
-extract_chi_values <- function(chi_res, gene){
-    observed <- chi_res$observed
-    expected <- chi_res$expected
-    chi_values_df <- data.frame(gene = gene,
-    MDD_status=rownames(observed),
-    Carrier_status= c(rep("Carrier",2 ), rep("Non-carrier",2)),
-    observed = as.vector(observed),
-    expected = as.vector(expected))
-    return(chi_values_df)
-}
-chi_values_list <- mapply(extract_chi_values, chi_res_list, genes, SIMPLIFY = FALSE)
-combined_chi_values <- rbindlist(chi_values_list)
+chi_results_all <- rbind(FADS1_chires[[1]] %>% as.data.frame(), FADS2_chires[[1]] %>% as.data.frame(), FADS3_chires[[1]] %>% as.data.frame(), FEN1_chires[[1]] %>% as.data.frame(), MYRF_chires[[1]] %>% as.data.frame(), TMEM258_chires[[1]] %>% as.data.frame()) 
+chi_values_all <- rbind(FADS1_chires[[2]], FADS2_chires[[2]], FADS3_chires[[2]], FEN1_chires[[2]], MYRF_chires[[2]], TMEM258_chires[[2]]) 
 
-write.table(chi_results_all, "all_carriers_mdd_chisq_results.tsv", sep = "\t", row.names =F, quote = F)
-write.table(combined_chi_values, "all_carriers_mdd_chisq_exp_obs.tsv", sep = "\t", row.names = F, quote = F)
+write.table(chi_results_all, "all_carriers_mdd_chisq_results_permask.tsv", sep = "\t", row.names =F, quote = F)
+write.table(chi_values_all, "all_carriers_mdd_chisq_exp_obs_permask.tsv", sep = "\t", row.names = F, quote = F)
 
 ###############################################################################
 
@@ -459,28 +453,71 @@ write.table(combined_chi_values, "all_carriers_mdd_chisq_exp_obs.tsv", sep = "\t
 ###############################################################################
 
 # Plot the confusion matrices between the carriers of a particular mask and non-carriers of that particular mask (these non carriers could be carriers of prioritised variants in another mask)
-all <- all %>%
-  mutate(across(
-    all_of(mask_columns), 
-    ~ ifelse(. == "non_carrier_any", "none-carrier", .)
-  ))
 
-mask <- all %>% filter(GENE=="FADS1") %>% filter(Mask1.0.01_status != "non-carrier")
-table(mask$Mask1.0.01_status, mask$MajDepr)
+chi_values_long <- reshape2::melt(chi_values_all, id.vars = c("gene", "mask", "MDD_status", "Carrier_status"), 
+                            measure.vars = c("observed", "expected"), 
+                            variable.name = "Type", value.name = "Value")
+chi_values_long <- chi_values_long %>% mutate(Type = case_when(Type == "observed" ~ "Observed",
+Type == "expected"~ "Expected"), fill=paste0(MDD_status, ":", Carrier_status))
 
 
-# Plot the confusion matrices between the carriers of a particular mask and non-carriers of ANY prioritised variant in ANY mask
+chi_exp_obs_plt <- function(genename) {
+plt <- ggplot(chi_values_long %>% filter(gene == genename), aes(x = Type, y = MDD_status, fill = Value)) +
+geom_tile(color = "black") +
+geom_text(aes(label = round(Value, 1)), color = "black") +
+facet_grid(mask ~ Carrier_status) +
+scale_fill_gradient(name = "Count",low = "white", high = "blue") +
+labs(
+title = paste0(genename, ": Observed and expected MDD status and carrier status \ncounts per mask"),
+x = "Carrier Status",
+y = "MDD Status",
+fill = "Value"
+) +
+theme_minimal()+
+ theme(
+strip.text.y = element_text(angle = 0), plot.title = element_text(hjust = 0.5, face = "bold"))
+return(plt)
+}
 
+ggsave(filename ="chi_exp_obs_FADS1.png", chi_exp_obs_plt("FADS1"), width = 8, height = 8, device = "png", dpi = 300)
+ggsave(filename ="chi_exp_obs_FADS2.png", chi_exp_obs_plt("FADS2"), width = 8, height = 8, device = "png", dpi = 300)
+ggsave(filename ="chi_exp_obs_FADS3.png", chi_exp_obs_plt("FADS3"), width = 8, height = 8, device = "png", dpi = 300)
+ggsave(filename ="chi_exp_obs_FEN1.png", chi_exp_obs_plt("FEN1"), width = 8, height = 8, device = "png", dpi = 300)
+ggsave(filename ="chi_exp_obs_MYRF.png", chi_exp_obs_plt("MYRF"), width = 8, height = 8, device = "png", dpi = 300)
+ggsave(filename ="chi_exp_obs_TMEM258.png", chi_exp_obs_plt("TMEM258"), width = 8, height = 8, device = "png", dpi = 300)
 
+observed_vals_plt <- ggplot(chi_values_long %>% filter(Type == "Observed"), aes(x = Carrier_status, y = MDD_status, fill = Value)) +
+geom_tile(color = "black") +
+geom_text(aes(label = round(Value, 1)), color = "black", size = 2.5) +
+facet_grid(mask~gene) +
+scale_fill_gradient(name = "Count",low = "white", high = "red") +
+labs(
+title = paste0("Observed counts of MDD and carrier status"),
+x = "Carrier Status",
+y = "MDD Status",
+fill = "Value"
+) +
+ theme_minimal()+
+theme(strip.text.y = element_text(angle = 0), axis.text.x = element_text(angle = 45, hjust = 1),
+plot.title = element_text(hjust = 0.5, face = "bold"))
 
+expected_vals_plt <- ggplot(chi_values_long %>% filter(Type == "Expected"), aes(x = Carrier_status, y = MDD_status, fill = Value)) +
+geom_tile(color = "black") +
+geom_text(aes(label = round(Value, 0)), color = "black", size = 2.5) +
+facet_grid(mask~gene) +
+scale_fill_gradient(name = "Count",low = "white", high = "red") +
+labs(
+title = paste0("Expected counts of MDD and carrier status"),
+x = "Carrier Status",
+y = "MDD Status",
+fill = "Value"
+) +
+ theme_minimal()+
+theme(strip.text.y = element_text(angle = 0), axis.text.x = element_text(angle = 45, hjust = 1),
+plot.title = element_text(hjust = 0.5, face = "bold"))
 
-
-
-
-
-
-
-
+ggsave(filename ="chi_observed_allgenes.png", observed_vals_plt, width = 8, height = 8, device = "png", dpi = 300)
+ggsave(filename ="chi_expected_allgenes.png", expected_vals_plt, width = 8, height = 8, device = "png", dpi = 300)
 
 
 # Summary of the carriers vs non carriers in baseline demographic variables 
@@ -576,14 +613,14 @@ ggsave(filename ="norm_metabolite_hists.png", norm_meta_plt, width = 10, height 
 
 ###################################################################################
 
-norm_metabolite_baseline <- reduce(gene_carriers_list, function(x,y){
-    left_join(x,y, by = c("f.eid"="SAMPLE"))
-}, .init = metabolite_baseline)
-norm_metabolite_baseline <- left_join(norm_metabolite_baseline, mdd, c("f.eid"= "IID"))
-summary_metacarrier_status <- function(carrier_dataframe, group_var) {
-    carrier_dataframe <- carrier_dataframe %>% filter(!is.na(!!sym(group_var)))
+norm_metabolite_carriers <- left_join(norm_metabolite_baseline, gene_carriers_all, by = c("f.eid"="SAMPLE"))
+
+summary_metacarrier_status <- function(carrier_dataframe, gene) {
+  print(gene)
+  carrier_dataframe <- carrier_dataframe %>% filter(GENE == gene)
+    carrier_dataframe <- carrier_dataframe %>% filter(!is.na(status))
     carrier_summary <- carrier_dataframe %>% 
-    group_by(!!sym(group_var)) %>% 
+    group_by(status) %>% 
 summarise(mean_age = mean(Age, na.rm = T),
 sd_age = sd(Age, na.rm = TRUE),
 mean_f.23443 = mean(f.23443.0.0, na.rm = TRUE),
@@ -633,7 +670,7 @@ other_eth_stat = paste0(num_other_ethnicity, " (", signif((num_other_ethnicity/t
 mdd_cases_stat = paste0(num_mdd_cases, " (", signif((num_mdd_cases/total)*100,3), "%)"),
 mdd_controls_stat = paste0(num_mdd_controls, " (", signif((num_mdd_controls/total)*100,3), "%)")
 ) %>% 
-select(!!sym(group_var), total, ends_with("stat")) %>% 
+select(status, total, ends_with("stat")) %>% 
 as.data.frame()
 return(carrier_summary)
 }
@@ -641,7 +678,7 @@ return(carrier_summary)
 # Use lapply to apply summary_metacarrier_status() to each gene
 lapply(genes, function(gene) {
     # Create the summary for the gene
-    carrier_summary <- summary_metacarrier_status(norm_metabolite_baseline, paste0(gene, "_status"))
+    carrier_summary <- summary_metacarrier_status(norm_metabolite_carriers, gene)
     
     # Write the summary to a .tsv file
     write.table(carrier_summary, 
@@ -658,13 +695,32 @@ lapply(genes, function(gene) {
 # Statistically test the differences in metabolite distributions between carriers and non carriers of FADS prioritised variants
 
 ###########################################################################
-metabolites <- colnames(norm_metabolite_baseline %>% select(ends_with(".0.0")))
-run_t_test <- function(metabolite, gene, data) {
-    gene_status <- paste0(gene, "_status")
-    ttest_result <- t.test(data[[metabolite]]~ data[[gene_status]], data = data)
+
+metabolites <- colnames(norm_metabolite_carriers %>% select(ends_with(".0.0")))
+norm_metabolite_carriers <- norm_metabolite_carriers %>%
+  mutate(across(
+    all_of(mask_columns), 
+    ~ ifelse(. == "non_carrier_any", "non-carrier", .)
+  ))
+
+run_t_test <- function(metabolite, gene, mask, data) {
+  print(gene)
+  print(mask)
+  print(metabolite)
+    data <- data %>% filter(GENE == gene)
+
+    if(length(table(data[[mask]]))==1) {
+      message(paste0("Skipping:", gene, mask, " - Mask not available"))
+      return(NULL)
+    }
+
+    print("Running t-test")
+    ttest_result <- t.test(data[[metabolite]]~ data[[mask]], data = data)
+    print("Results table")
     result <- data.frame(
         metabolite= get_metabolitename(metabolite),
         gene=gene,
+        mask=mask,
         t_statistic=ttest_result$statistic,
         df=ttest_result$parameter,
         conf_int_lower=ttest_result$conf.int[1],
@@ -674,17 +730,29 @@ run_t_test <- function(metabolite, gene, data) {
     )
     return(result)
 }
-ttest_results <- list()
-for (metabolite in metabolites) {
-    for (gene in genes) {
-        ttest_results[[paste(metabolite, gene, sep = "_")]] <- run_t_test(metabolite, gene, norm_metabolite_baseline)
-    }
-}
-ttest_results_df <- do.call(rbind, ttest_results)
-ttest_results_df$pval_BH <- p.adjust(ttest_results_df$p_value, method = "BH")
-ttest_results_df <- ttest_results_df %>% arrange(pval_BH)
 
-write.table(ttest_results_df, "ttest_metabolite_carrier_all_results.tsv", sep = "\t", row.names = F, quote = F)
+ttest_results <- do.call(
+  rbind,
+  lapply(metabolites, function(metabolite) {
+    do.call(
+      rbind, 
+      lapply(genes, function(gene) {
+        do.call(rbind,
+        lapply(mask_columns, function(mask) {
+          run_t_test(metabolite, gene, mask, norm_metabolite_carriers)
+        })
+        )
+      })
+    )
+  })
+)
+
+ttest_results <- ttest_results[!sapply(ttest_results, is.null),]
+
+ttest_results$pval_BH <- p.adjust(ttest_results$p_value, method = "BH")
+ttest_results <- ttest_results %>% arrange(pval_BH)
+
+write.table(ttest_results, "ttest_metabolite_carrier_permask_all_results.tsv", sep = "\t", row.names = F, quote = F)
 
 ###################################################################################
 
@@ -699,22 +767,25 @@ ymax <- m+sd(x)
   return(c(y=m, ymin = ymin, ymax = ymax))
 }
 
-violin_meta_dists <- function(gene, metabolite) {
+violin_meta_dists <- function(gene, metabolite, mask) {
     # Filter out NA values for the gene status column
-    norm_metabolite <- norm_metabolite_baseline %>% 
-        filter(!is.na(!!sym(paste0(gene, "_status")))) %>%
-        mutate(!!paste0(gene, "_status") := factor(!!sym(paste0(gene, "_status")), levels = c("carrier", "non-carrier")))
-    
+    norm_metabolite <- norm_metabolite_carriers %>% 
+        filter(GENE == gene) %>%
+        mutate(across(
+    all_of(mask_columns), 
+    ~ factor(., levels = c("carrier", "non-carrier"))
+  ))
     # Get the relevant ttest result
     metabolitename <- get_metabolitename(metabolite)
-    genename = gene
-    ttest_res <- ttest_results_df %>% filter(metabolite == metabolitename & gene == genename)
+    genename <- gene
+    maskname <- mask
+    ttest_res <- ttest_results %>% filter(metabolite == metabolitename & gene == genename & mask == maskname)
     ttest_p <- ttest_res$p_value
     ttest_plabel <- paste0("p = ", formatC(ttest_p, format = "e", digits = 2) %>% as.character())
-    plt <- ggplot(norm_metabolite, aes(x = as.factor(!!sym(paste0(gene, "_status"))), 
+    plt <- ggplot(norm_metabolite, aes(x = as.factor(!!sym(mask)), 
                                        y = !!sym(metabolite),
-                                       color = as.factor(!!sym(paste0(gene, "_status"))), 
-                                       fill = as.factor(!!sym(paste0(gene, "_status"))))) + 
+                                       color = as.factor(!!sym(mask)), 
+                                       fill = as.factor(!!sym(mask)))) + 
         geom_violin(trim = FALSE, na.rm = TRUE, alpha = 0.3) +
         scale_color_brewer(palette = "Set1", aesthetics = c("colour", "fill"), 
                            labels = c("Carrier", "Non-carrier"), 
@@ -722,9 +793,9 @@ violin_meta_dists <- function(gene, metabolite) {
         theme_classic() +
         geom_jitter(shape = 16, position = position_jitter(0.2), na.rm = TRUE) +
         stat_summary(fun.data = data_summary, shape = 23, color = "black", na.rm = TRUE) + 
-        labs(title = "", 
-             x = "", 
-             y = 'Normalised measure') + 
+        labs(title ="", 
+             x = mask, 
+             y =  'Normalised measure') + 
         scale_x_discrete(labels = c("Carrier", "Non-carrier")) +
         theme(legend.position = "none", 
               text = element_text(size = 9)) +
@@ -741,19 +812,21 @@ violin_meta_dists <- function(gene, metabolite) {
 # Plotting the violin plots 
 lapply(genes, function(gene) {
       metabolites <- c("f.23443.0.0", "f.23444.0.0", "f.23450.0.0", "f.23451.0.0", "f.23459.0.0")
-  
-  # Use ggarrange to combine the plots
-  plot_list <- lapply(metabolites, function(metabolite) {
-    violin_meta_dists(gene, metabolite)
+  lapply(mask_columns, function(mask) {
+plot_list <- lapply(metabolites, function(metabolite) {
+    violin_meta_dists(gene, metabolite, "Mask4.0.01_status")
   })
+  # Use ggarrange to combine the plots
     arranged_plot <- ggarrange(plotlist = plot_list, 
                              nrow = 3, 
                              ncol = 2, 
                              labels = sapply(metabolites, get_metaboliteshort))
   
   # Save the plot
-  ggsave(filename = paste0(gene, "_meta_hists_carriers.png"), 
-         plot = annotate_figure(arranged_plot, top = text_grob(paste0(gene, ": All prioritised variants"), size = 14, face = "bold")),
+  ggsave(filename = paste0(gene, "_meta_hists_carriers_", gsub("_status", "", mask), ".png"), 
+         plot = annotate_figure(arranged_plot, top = text_grob(paste0(gene, ":", gsub("_status", "", mask)), size = 14, face = "bold")),
          width = 8, height = 10, device = "png", dpi = 300)
 })
+  })
+
 
