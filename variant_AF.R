@@ -5,7 +5,7 @@ library(dplyr)
 library(ggpubr)
 library(readr) # Have to install this in the post workbench
 # dx download the variants 
-# dx download /Output/gene_VCF_variants/variants/*QC_variants.tsv
+# dx download /Output/gene_VCF_variants/variants/QC_variants/*QC_variants.tsv
 # dx download /Input/FADS_cluster_UKB_pVCF.tsv
 
 # Read in the FADS coordinates used to index the VCF files 
