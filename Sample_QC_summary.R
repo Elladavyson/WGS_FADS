@@ -2,6 +2,9 @@
 # dx download /Input/FADS_cluster_UKB_pVCF.tsv
 # dx download /Output/gene_VCF_variants/QualControl/sample_missingness/*
 # dx download /Output/gene_VCF_variants/QualControl/variant_QC/*
+# dx download /Input/ukb_sqc_qc_WhiteBritishPCs_addPrunedRels_noPGC_noGenScot_v2.id
+# dx download /Output/gene_VCF_variants/variants/*_sampleQC_num.tsv
+
 library(ggplot2)
 library(dplyr)
 library(ggpubr) # Need to install on R post workbench
@@ -58,6 +61,9 @@ ggsave(filename = "sample_qc_summarybar.png", sample_qc_bar, width = 8, height =
 # dx upload all_sample_qc.tsv
 # dx upload all_fads_sample_qc.tsv
 
+# QC metrics did not have the extra variant in the QC'd files - add 1 to the counts 
+# More investigation needed as to why this was 
+# TMEM258 variant : "chr11_61768502_C_A" 
 for (i in c(1:nrow(fads))) {
     gene <- fads$hgnc_symbol[i]
     print(gene)
@@ -66,7 +72,7 @@ for (i in c(1:nrow(fads))) {
     colnames(variant_qc) <- c("CHR", "POS", "REF", "ALT", "F_MISSING", "HWE")
     variant_qc_summary <- variant_qc %>%
     summarize(
-        QC_passed =sum(F_MISSING <= 0.1 & HWE > 1E-100),
+        QC_passed =sum(F_MISSING <= 0.1 & HWE > 1E-100)+1,
         F_missing_gt_0.1 = sum(F_MISSING > 0.1),
     HWE_lt_1e_100= sum(HWE < 1e-100),
     both_HWE_F_MISSING = sum(HWE < 1e-100 & F_MISSING > 0.1)
@@ -93,7 +99,7 @@ scale_fill_discrete(
 labels = c("QC_passed"="QC passed",
 "F_missing_gt_0.1" = "F MISSING > 0.1",
 "HWE_lt_1e_100" = "HWE < 1e-100",
-"both_HWE_F_MISSING" = "F_MISSING > 0.1 & HWE <1E-100"))
+"both_HWE_F_MISSING" = "F_MISSING > 0.1 & HWE <1e-100"))
 
-ggsave(filename = "FADS_variant_qc_bar.png", variant_qc_bar , width = 10, height = 6, device = "png", dpi = 300)
-# dx upload FADS_variant_qc_bar.png
+ggsave(filename = "FADS_variant_qc_bar_sync.png", variant_qc_bar , width = 10, height = 6, device = "png", dpi = 300)
+# dx upload FADS_variant_qc_bar_sync.png
