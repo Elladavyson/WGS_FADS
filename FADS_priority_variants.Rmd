@@ -167,16 +167,17 @@ mask_af_long <-
 mask_af_long$AF_Threshold <- factor(mask_af_long$AF_Threshold, levels = c("singleton", "0.0001", "0.001", "0.01"))
 mask_af_long <- mask_af_long %>% mutate(mask_label=factor(mask_label, levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
 
-mask_af_plt <- ggplot(mask_af_long %>% filter(Value ==1), aes(x = AF_Threshold, fill = mask_label)) +
+mask_af_plt <- ggplot(mask_af_long %>% filter(Value ==1 & (AF_Threshold == 'singleton' | AF_Threshold == "0.01")), aes(x = AF_Threshold, fill = mask_label)) +
   geom_bar(stat = "count", position = position_dodge(width=0.8)) +
  geom_text(stat="count", aes(label = after_stat(count), color = mask_label), vjust = -0.5, size = 3, show.legend = FALSE, position = position_dodge(width = 0.8)) +
 guides(color= guide_legend(label = FALSE)) +
   facet_wrap(~GENE) +  # Facet by GENE
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette="Set1")+
-  labs(x = "AF Threshold", y = "Count", title = "Variant Count by AF Threshold and Mask", fill = "Mask Criteria") +
+  labs(x = "AF Threshold", y = "Count", title = "", fill = "Mask Criteria") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text = element_text(size = 14, face = 'bold')) 
 
 ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_af_counts.png", mask_af_plt, width = 10, height = 6, device = "png", dpi= 300)
 mask_af_plt
@@ -185,6 +186,12 @@ mask_af_plt
 
 The biggest change in number of variants is between singleton variants and 0.01, so just include two aaf bins in REGENIE, using --aaf-bins 0.01 
 (singletons are always included as a default in addition to this flag)
+
+Results tables : 
+
+```{r}
+
+```
 
 ## Lolliplots of each Mask 
 
@@ -254,9 +261,9 @@ sample.gr.0.01$color <- variant_0.01$color_for_lolliplot_impact
 print("Label")
 sample.gr.0.01$label.parameter.label <- ""
 print("Score")
-sample.gr.0.01$score <- variant_0.01$althet_carriers
+sample.gr.0.01$score <- as.numeric(variant_0.01$althet_carriers)
 print("node label")
-sample.gr.0.01$node.label <- as.character(sample.gr.0.01$score)
+sample.gr.0.01$node.label <- as.character(variant_0.01$althet_carriers)
 print("legend")
 legend <- list(labels=c("HIGH" , "MODERATE", "LOW", "MODIFIER"), 
                col = c("red","orange", "#90EE90", "lightpink"), 
@@ -275,7 +282,7 @@ sample.gr.0.01$node.label.cex <- 1
 print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"))
 png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
-lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
+lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar, label.parameter.label = sample.gr.0.01$node.label, lollipop_style_switch_limit = 0)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
           gp=gpar(cex=1.5, fontface="bold"))
 dev.off()
