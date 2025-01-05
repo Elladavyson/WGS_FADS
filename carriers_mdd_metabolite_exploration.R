@@ -368,7 +368,7 @@ all_gene_carriers <- all_gene_carriers %>%
 # Extract Chi-square results
 extract_chi_res <- function(chi_res, gene, mask) {
     statistic <- chi_res$statistic
-    df <- chi_res$statistic
+    df <- chi_res$parameter
     p <- chi_res$p.value
     method <- chi_res$method
     df <- data.frame(gene=gene, mask=mask, statistic=statistic, df=df, p=p, method = method)
