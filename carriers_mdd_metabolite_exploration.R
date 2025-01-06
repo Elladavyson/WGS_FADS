@@ -34,6 +34,12 @@ library(caret) # Have to install
 print("--------------------------------------------------")
 print("READING IN DATA")
 print("--------------------------------------------------")
+print("Reading in MDD phenotype file")
+mdd <- read.table("ukb_unrel_eur_pgc3_mdd.pheno", header = T)
+# Filter out missing values for MDD
+mdd <- mdd %>% filter(MajDepr != -9)
+print("Reading in the Metabolite phenotype file")
+metabol <- read.table("ukb_unrel_eur_metabol.pheno", header = T)
 # Reading in the mask file
 masks <- read.table("masks_FADS.txt", header = F)
 # the annotation file
@@ -79,7 +85,7 @@ Mask3.singleton_status = ifelse(Mask3.0.01_status == "carrier" & singleton == 1,
 Mask4.singleton_status = ifelse(Mask4.0.01_status == "carrier" & singleton == 1, "carrier", "non-carrier"),
 Mask5.singleton_status = ifelse(Mask5.0.01_status == "carrier" & singleton == 1, "carrier", "non-carrier"),
     )
-    participant_geno_all <- participant_genotype %>% select(SAMPLE, starts_with("Mask")) 
+    participant_geno_all <- participant_genotype 
    # For carriers of multiple varaints, ensure no duplications and they are marked as a carrier of the most deleterious variant (i.e the smallest mask)
    # Get the participants with duplicate rows (compound heterozygous)
    participant_geno_duplicated <- participant_geno_all  %>%
@@ -162,27 +168,70 @@ gene_carriers_list <- list(FADS1_carriers, FADS2_carriers, FADS3_carriers, FEN1_
 gene_carriers_all <- do.call(rbind, gene_carriers_list)
 part_summary_all <- do.call(rbind, part_summary_list)
 variant_zy_all <- do.call(rbind, variant_zygosity_list)
+part_genotype_all <- rbind(FADS1_part_genotype, FADS2_part_genotype, FADS3_part_genotype, FEN1_part_genotype, MYRF_part_genotype, TMEM258_part_genotype)
 
 # Participant summary information (what type of carriers etc)
+
 part_summary_all_long <- part_summary_all %>% 
 pivot_longer(cols = starts_with('Mask'),
 names_to="Mask",
 values_to = "Carrier_status") %>%
 mutate(Mask = gsub("_status", "", Mask))
 
+# Computing separate summaries for the MDD-cohort and the metabolite cohort
+part_summary_long_mdd <- part_summary_all_long %>% filter(SAMPLE %in% mdd$IID)
+part_summary_long_metabol <- part_summary_all_long %>% filter(SAMPLE %in% metabol$IID)
+
 part_carriers_summary <- part_summary_all_long %>% group_by(
   GENE, Mask, Carrier_status, carrier_type
 ) %>%
 summarise(Count = n(), .groups = "drop")
 
-carrier_types_plt_permask <- ggplot(part_carriers_summary %>% filter(Carrier_status == "carrier"), aes(x = Mask, y = Count, fill = carrier_type))+ 
+part_carriers_summary_mdd <- part_summary_long_mdd %>% group_by(
+  GENE, Mask, Carrier_status, carrier_type
+) %>%
+summarise(Count = n(), .groups = "drop")
+
+part_carriers_summary_metabol <- part_summary_long_metabol %>% group_by(
+  GENE, Mask, Carrier_status, carrier_type
+) %>%
+summarise(Count = n(), .groups = "drop")
+
+##### Carrier types per mask for the MDD cohort 
+carrier_types_plt_permask_mdd <- ggplot(part_carriers_summary_mdd %>% filter(Carrier_status == "carrier"), aes(x = Mask, y = Count, fill = carrier_type))+ 
     geom_bar(stat="identity", position = "dodge") + facet_wrap(~GENE) + 
     geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
     theme_minimal() + 
-    labs(x = "Mask", y = "Number of Carriers", fill = "Carrier type") + guides(color= guide_legend(label = FALSE)) +
+    labs(x = "Mask", y = "Number of Carriers", fill = "Carrier type", title = "MDD-cohort") + guides(color= guide_legend(label = FALSE)) +
     theme(
         axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position="top")
+    plot.title = element_text(hjust = 0.5, face = "bold"))
+
+##### Carrier types per mask for the Metabolite cohort 
+
+carrier_types_plt_permask_metabolite <- ggplot(part_carriers_summary_metabol %>% filter(Carrier_status == "carrier"), aes(x = Mask, y = Count, fill = carrier_type))+ 
+    geom_bar(stat="identity", position = "dodge") + facet_wrap(~GENE) + 
+    geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
+    theme_minimal() + 
+    labs(x = "Mask", y = "Number of Carriers", fill = "Carrier type", title = "Metabolite-cohort") + guides(color= guide_legend(label = FALSE)) +
+    theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5, face = "bold"))
+
+#### Saving the plots 
+ggsave(filename ="carrier_types_genes_permask_AF_cohorts.png", 
+ggarrange(carrier_types_plt_permask_mdd, 
+carrier_types_plt_permask_metabolite, 
+common.legend = T, nrow = 2, ncol =1, legend = "right"), width = 12, height = 6, device = "png", dpi = 300)
+
+ggsave(filename ="carrier_types_genes_permask_AF_mddcohort.png", 
+carrier_types_plt_permask_mdd, width = 12, height = 6, device = "png", dpi = 300)
+
+ggsave(filename ="carrier_types_genes_permask_AF_metabolitecohort.png", 
+carrier_types_plt_permask_metabolite, width = 12, height = 6, device = "png", dpi = 300)
+
+#### Plots about gene carriers/non carriers
+#### For MDD and Metabolite cohort separately
 
 carrier_summary_all_long <- gene_carriers_all %>% 
 pivot_longer(cols = starts_with('Mask'),
@@ -190,43 +239,117 @@ names_to="Mask",
 values_to = "Carrier_status")  %>%
 mutate(Mask = gsub("_status", "", Mask))
 
+gene_carriers_mdd <- gene_carriers_all %>% filter(SAMPLE %in% mdd$IID)
+gene_carriers_metabol <- gene_carriers_all %>% filter(SAMPLE %in% metabol$IID)
+carrier_summary_all_long_mdd <- carrier_summary_all_long %>% filter(SAMPLE %in% mdd$IID)
+carrier_summary_all_long_metabol <- carrier_summary_all_long %>% filter(SAMPLE %in% metabol$IID)
+
 # Establish the number of non carriers for each gene (static)
 # The number of carriers (total), the other graph goes into more detail as to which carrier is which 
 carrier_numbers_plt <- ggplot(gene_carriers_all, aes(x= "status", fill=status)) + 
 geom_bar(stat="count", position = "dodge") + 
-geom_text(stat = "count", aes(label = after_stat(count), color = status), position = position_dodge(width = 0.8), vjust = -0.5, size = 3, show.legend = FALSE) +
+geom_text(stat = "count", aes(label = after_stat(count), color = status), position = position_dodge(width = 0.8), vjust = -0.5, size = 2, show.legend = FALSE) +
 theme_minimal() + 
-labs(x = "", y = "Count", fill = "") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
+labs(x = "", y = "Count", fill = "") + 
+guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE) +
+theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+carrier_numbers_plt_mdd <- ggplot(gene_carriers_mdd, aes(x= "status", fill=status)) + 
+geom_bar(stat="count", position = "dodge") + 
+geom_text(stat = "count", aes(label = after_stat(count)),  color = "black",position = position_dodge(width = 0.8), vjust = -0.5, size = 3, show.legend = FALSE) +
+theme_minimal() + 
+labs(x = "", y = "Count", fill = "", title = "MDD-cohort") + 
+guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE) +
+theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+carrier_numbers_plt_metabol <- ggplot(gene_carriers_metabol, aes(x= "status", fill=status)) + 
+geom_bar(stat="count", position = "dodge") + 
+geom_text(stat = "count", aes(label = after_stat(count)), color = "black", position = position_dodge(width = 0.8), vjust = -0.5, size =3, show.legend = FALSE) +
+theme_minimal() + 
+labs(x = "", y = "Count", fill = "", title = "Metabolite-cohort") + 
+guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE) +
+theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+ggsave(filename ="carrier_numbers_genes_percohort.png", 
+ggarrange(carrier_numbers_plt_mdd, carrier_numbers_plt_metabol, common.legend = T, nrow = 2, ncol = 1), 
+ width = 21 / 2.54, height = 29.7 / 2.54,device = "png", dpi = 300)
+
+##### Carrier numbers per mask separately for MDD and metabolite cohort 
 
 carrier_numbers_permask <- ggplot(carrier_summary_all_long, aes(x= Mask, fill=Carrier_status)) + 
     geom_bar(stat="count", position = "dodge") + 
-    geom_text(stat = "count", aes(label = after_stat(count), color = Carrier_status), position = position_dodge(width = 0.8), vjust = -0.5, size = 2, show.legend = FALSE) +
+    geom_text(stat = "count", aes(label = after_stat(count)), color = "black", position = position_dodge(width = 0.8), vjust = -0.5, size = 2, show.legend = FALSE) +
     theme_minimal() + 
     labs(x = "", y = "Count", fill = "") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)+theme(
         axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Carriers of pathogenic in various different genes (?)
-# UpSet Plot of all the carriers 
-carriers_across_genes <- list()
 
-gene_carriers_summ <- gene_carriers_all %>% 
+carrier_numbers_permask_mdd <- ggplot(carrier_summary_all_long_mdd, aes(x= Mask, fill=Carrier_status)) + 
+    geom_bar(stat="count", position = "dodge") + 
+    geom_text(stat = "count", aes(label = after_stat(count)), color = "black", position = position_dodge(width = 0.8), vjust = -0.5, size = 2, show.legend = FALSE) +
+    theme_minimal() + 
+    labs(x = "", y = "Count", fill = "", title= "MDD-cohort") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)+theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5, face = "bold"))
+
+
+carrier_numbers_permask_metabol <- ggplot(carrier_summary_all_long_metabol, aes(x= Mask, fill=Carrier_status)) + 
+    geom_bar(stat="count", position = "dodge") + 
+    geom_text(stat = "count", aes(label = after_stat(count)), color = "black", position = position_dodge(width = 0.8), vjust = -0.5, size = 2, show.legend = FALSE) +
+    theme_minimal() + 
+    labs(x = "", y = "Count", fill = "", title = "Metabolite-cohort") + guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5, face = "bold"))
+
+ggsave(filename="carrier_numbers_permask_mdd.png", carrier_numbers_permask_mdd, width = 12, height = 8, device = "png", dpi = 300)
+ggsave(filename="carrier_numbers_permask_metabolite.png", carrier_numbers_permask_metabol, width = 12, height = 8, device = "png", dpi = 300)
+
+# Carriers of pathogenic in various different genes (?)
+# UpSet Plot of MDD cohort cross-carriers 
+carriers_across_genes_mdd <- list()
+carriers_across_genes_metabol <- list()
+
+gene_carriers_summ_mdd <- gene_carriers_mdd %>% 
 group_by(SAMPLE) %>% 
 summarise(numgenes_carriers=sum(status=='carrier'),
 gene_carriers = paste(GENE[status=="carrier"], collapse = ",")) 
+
+gene_carriers_summ_metabol <- gene_carriers_metabol %>% 
+group_by(SAMPLE) %>% 
+summarise(numgenes_carriers=sum(status=='carrier'),
+gene_carriers = paste(GENE[status=="carrier"], collapse = ",")) 
+
 # List of genes to check
 genes <- c("FADS1", "FADS2", "FADS3", "FEN1", "MYRF", "TMEM258")
 # Create columns dynamically for each gene
-carriers_across_genes <- genes %>%
+carriers_across_genes_mdd <- genes %>%
   set_names() %>%
-  map(~ gene_carriers_summ %>%
+  map(~ gene_carriers_summ_mdd %>%
         filter(grepl(.x, gene_carriers)) %>%
         pull(SAMPLE))
-upset_plt <- upset(fromList(carriers_across_genes), nsets = length(carriers_across_genes), set_size.show = TRUE, order.by = 'freq')
+
+carriers_across_genes_metabol <- genes %>%
+  set_names() %>%
+  map(~ gene_carriers_summ_metabol %>%
+        filter(grepl(.x, gene_carriers)) %>%
+        pull(SAMPLE))
+
+upset_plt_metabol <- upset(fromList(carriers_across_genes_metabol), nsets = length(carriers_across_genes_metabol), 
+set_size.show = TRUE, order.by = 'freq') + grid.text("Metabolite-cohort", x = 0.5, y = 0.97, gp = gpar(fontsize = ))
 
 # Plot the Upset Plot
-png(paste0("UpSet_privar_carriers_genes.png"), 
+png(paste0("UpSet_privar_carriers_genes_mdd.png"), 
     width = 3200, height = 2000, res = 300, type = "cairo")
-upset_plt
+upset(fromList(carriers_across_genes_mdd), nsets = length(carriers_across_genes_mdd),
+set_size.show = TRUE, order.by = 'freq')
+grid.text("MDD-cohort", x = 0.5, y = 0.97, gp = gpar(fontsize = 20))
+dev.off()
+
+png(paste0("UpSet_privar_carriers_genes_metabol.png"), 
+    width = 3200, height = 2000, res = 300, type = "cairo")
+upset(fromList(carriers_across_genes_metabol), nsets = length(carriers_across_genes_metabol),
+set_size.show = TRUE, order.by = 'freq')
+grid.text("Metabolite-cohort", x = 0.5, y = 0.97, gp = gpar(fontsize = 20))
 dev.off()
 
 ggsave(filename ="carrier_types_genes_permask_AF.png", carrier_types_plt_permask, width = 12, height = 6, device = "png", dpi = 300)
@@ -239,10 +362,6 @@ ggsave(filename="carrier_numbers_permask.png", carrier_numbers_permask, width = 
 
 ###############################################################################
 
-print("Reading in MDD phenotype file")
-mdd <- read.table("ukb_unrel_eur_pgc3_mdd.pheno", header = T)
-print("Reading in the Metabolite phenotype file")
-metabol <- read.table("ukb_unrel_eur_metabol.pheno", header = T)
 print("The covariate file")
 covars <- read.table("ukb_unrel_eur_covars.covar", header = T)
 # Read in all cohort info 
@@ -269,8 +388,7 @@ all <- all %>%
            ethnicity %in% c('Asian or Asian British', 'White and Black African', 'Any other mixed background', 'Mixed' , 'Black or Black British' , 'White and Black Caribbean', 'White and Asian') ~ 1,
            ethnicity %in% c('Chinese', 'Pakistani' , 'African' , 'Do not know' , 'Other ethnic group' , 'Indian' , 'Bangladeshi' , 'Caribbean' , 'Any other black background') ~ 2
          ))
-# Filter out missing values for MDD
-mdd <- mdd %>% filter(MajDepr != -9)
+
 all <- left_join(all, mdd, c("f.eid"= "IID"))
 
 ################################################################################
@@ -285,14 +403,21 @@ all <- left_join(all, mdd, c("f.eid"= "IID"))
 mask_columns <- grep("Mask", names(gene_carriers_all), value = TRUE)
 
 # Apply the transformation
-gene_carriers_all <- gene_carriers_all %>%
+gene_carriers_mdd <- gene_carriers_mdd %>%
+  mutate(across(
+    all_of(mask_columns), 
+    ~ ifelse(status == "non-carrier", "non_carrier_any", .)
+  ))
+gene_carriers_metabol <- gene_carriers_metabol %>%
   mutate(across(
     all_of(mask_columns), 
     ~ ifelse(status == "non-carrier", "non_carrier_any", .)
   ))
 
+
 # Merge the general carrier information with the demographics (i.e carrier/non_carrier)
-all_gene_carriers <- left_join(all, gene_carriers_all, by = c("f.eid"="SAMPLE"))
+all_gene_carriers_mdd <- left_join(all, gene_carriers_mdd, by = c("f.eid"="SAMPLE"))
+all_gene_carriers_metabol <- left_join(all, gene_carriers_metabol, by = c("f.eid"="SAMPLE"))
 
 summary_carrier_status <- function(carrier_dataframe, gene) {
   carrier_dataframe <- carrier_dataframe %>% filter(GENE == gene)
@@ -342,16 +467,23 @@ genes <- fads_genes$hgnc_symbol
 # Use lapply to apply summary_carrier_status() to each gene
 lapply(genes, function(gene) {
     # Create the summary for the gene
-    carrier_summary <- summary_carrier_status(all_gene_carriers, gene)
-    
+    print(gene)
+    mddcohort_carrier_summary <- summary_carrier_status(all_gene_carriers_mdd, gene)
+    metabolcohort_carrier_summary <- summary_carrier_status(all_gene_carriers_metabol, gene)
     # Write the summary to a .tsv file
-    write.table(carrier_summary, 
-                file = paste0(gene, "_allcarriers_summarydemo.tsv"), 
+    write.table(mddcohort_carrier_summary, 
+                file = paste0(gene, "_allcarriers_summarydemo_MDDcohort.tsv"), 
+                sep = "\t", 
+                row.names = FALSE, 
+                quote = FALSE)
+    write.table(metabolcohort_carrier_summary, 
+                file = paste0(gene, "_allcarriers_summarydemo_metabolitecohort.tsv"), 
                 sep = "\t", 
                 row.names = FALSE, 
                 quote = FALSE)
     # Assign to workspace to inspect
-    assign(paste0(gene, "_carrier_summary"),carrier_summary)
+    assign(paste0(gene, "_carrier_summary_mdd"),mddcohort_carrier_summary)
+    assign(paste0(gene, "_carrier_summary_metabol"),metabolcohort_carrier_summary)
 })
 
 ################################################################################
@@ -359,7 +491,7 @@ lapply(genes, function(gene) {
 # Chi Squared test of proportions (now not needed as have run REGENIE instead)
 
 ################################################################################
-all_gene_carriers <- all_gene_carriers %>%
+all_gene_carriers_mdd <- all_gene_carriers_mdd %>%
   mutate(across(
     all_of(mask_columns), 
     ~ ifelse(. == "non_carrier_any", "non-carrier", .)
@@ -433,12 +565,12 @@ chi_test <- function(df, gene) {
 }
 
 
-FEN1_chires <- chi_test(all_gene_carriers, "FEN1")
-FADS1_chires <- chi_test(all_gene_carriers, "FADS1")
-FADS2_chires <- chi_test(all_gene_carriers, "FADS2")
-FADS3_chires <- chi_test(all_gene_carriers, "FADS3")
-MYRF_chires <- chi_test(all_gene_carriers, "MYRF")
-TMEM258_chires <- chi_test(all_gene_carriers, "TMEM258")
+FEN1_chires <- chi_test(all_gene_carriers_mdd, "FEN1")
+FADS1_chires <- chi_test(all_gene_carriers_mdd, "FADS1")
+FADS2_chires <- chi_test(all_gene_carriers_mdd, "FADS2")
+FADS3_chires <- chi_test(all_gene_carriers_mdd, "FADS3")
+MYRF_chires <- chi_test(all_gene_carriers_mdd, "MYRF")
+TMEM258_chires <- chi_test(all_gene_carriers_mdd, "TMEM258")
 
 chi_results_all <- rbind(FADS1_chires[[1]] %>% as.data.frame(), FADS2_chires[[1]] %>% as.data.frame(), FADS3_chires[[1]] %>% as.data.frame(), FEN1_chires[[1]] %>% as.data.frame(), MYRF_chires[[1]] %>% as.data.frame(), TMEM258_chires[[1]] %>% as.data.frame()) 
 chi_values_all <- rbind(FADS1_chires[[2]], FADS2_chires[[2]], FADS3_chires[[2]], FEN1_chires[[2]], MYRF_chires[[2]], TMEM258_chires[[2]]) 
@@ -466,7 +598,7 @@ plt <- ggplot(chi_values_long %>% filter(gene == genename), aes(x = Type, y = MD
 geom_tile(color = "black") +
 geom_text(aes(label = round(Value, 1)), color = "black") +
 facet_grid(mask ~ Carrier_status) +
-scale_fill_gradient(name = "Count",low = "white", high = "blue") +
+scale_fill_gradient(name = "Count",low = "white", high = "red") +
 labs(
 title = paste0(genename, ": Observed and expected MDD status and carrier status \ncounts per mask"),
 x = "Carrier Status",
@@ -814,7 +946,7 @@ lapply(genes, function(gene) {
       metabolites <- c("f.23443.0.0", "f.23444.0.0", "f.23450.0.0", "f.23451.0.0", "f.23459.0.0")
   lapply(mask_columns, function(mask) {
 plot_list <- lapply(metabolites, function(metabolite) {
-    violin_meta_dists(gene, metabolite, "Mask4.0.01_status")
+    violin_meta_dists(gene, metabolite, mask)
   })
   # Use ggarrange to combine the plots
     arranged_plot <- ggarrange(plotlist = plot_list, 
@@ -829,4 +961,25 @@ plot_list <- lapply(metabolites, function(metabolite) {
 })
   })
 
+########## Getting variant summaries for the prioritised variants in the MDD cohort and metabolite cohort
+
+# Read in the priority variant tables 
+# Subset to the variants which are present in the participants in the two different cohorts
+# Save for making the variant plots separately for the MDD cohort and the metabolite cohort 
+
+for (i in c(1:nrow(fads_genes))){
+  gene <- fads_genes$hgnc_symbol[i]
+  priority <- read.table(paste0(gene, "_priority_annot.tsv"), sep = "\t", header = T)
+  print(paste0("Read in priority variants: ", gene, " (n=", nrow(priority), ")"))
+  part_genotype_mdd <- part_genotype_all %>% filter(SAMPLE %in% mdd$IID)
+  part_genotype_metabol <- part_genotype_all %>% filter(SAMPLE %in% metabol$IID)
+  mdd_variants <- c(part_genotype_mdd$het_variants, part_genotype_mdd$hom_variants) %>% unique()
+  metabol_variants <- c(part_genotype_metabol$het_variants, part_genotype_metabol$hom_variants) %>% unique()
+  priority_mdd <- priority %>% filter(chr_pos_ref_alt %in% mdd_variants)
+  priority_metabol <- priority %>% filter(chr_pos_ref_alt %in% metabol_variants)
+  write.table(priority_mdd, paste0(gene, "_priority_var_mdd.tsv"), sep = "\t", row.names = F, quote = F)
+  write.table(priority_metabol, paste0(gene, "_priority_var_metabol.tsv"), sep = "\t", row.names = F, quote = F)
+  assign(paste0(gene, "_priority_var_mdd"), priority_mdd)
+  assign(paste0(gene, "_priority_var_metabol"), priority_metabol)
+}
 

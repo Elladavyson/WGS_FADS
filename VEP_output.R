@@ -21,7 +21,7 @@ opt <- parse_args(OptionParser(option_list=option_list), args = args)
 
 gene <- opt$gene
 
-file_dir <-paste0(getwd(), "/AC_overzero/", gene, "_vepoutput_proc/")
+file_dir <-paste0(getwd(), "/AC_overzero_02_01/", gene, "_vepoutput_proc/")
 # Check if the directory exists
 if (!dir.exists(file_dir)) {
   # If it doesn't exist, create the directory
@@ -31,8 +31,11 @@ if (!dir.exists(file_dir)) {
   message("File Directory already exists: ", file_dir)
 }
 
+############# LOGGING #############
 sink(paste0(file_dir, gene, "_vepoutput_", Sys.Date(), ".log"))
 print(paste0("Results from this script saved to: ", file_dir))
+############ READING IN DATA #############
+####### ALL VARIANTS (POST-SAMPLE AND VARIANT QC)
   vep_consequence <- factor(c("transcript_ablation", "splice_acceptor_variant", "splice_donor_variant", 
   "stop_gained", "frameshift_variant", "stop_lost", "start_lost", "transcript_amplification", "feature_elongation", 
   "feature_truncation", "inframe_insertion", "inframe_deletion", "missense_variant", "protein_altering_variant", 
@@ -63,6 +66,24 @@ vep_output <- fread(paste0("VEP_output/", gene, "_QC_nosamples_vepannot.vcf_anno
 print("How many variant annotations back from VEP")
 # Check how many variants in the file 
 length(unique(vep_output$chr_pos_ref_alt))
+# Read in variant allele frequency 
+print(paste0("Reading in the internal Allele Frequency file from ", "~/edavyson/WGS_FADS/QC/", gene, "_QC_variants.tsv"))
+internal_AF <- read.table(paste0("~/edavyson/WGS_FADS/QC/", gene, "_QC_variants.tsv"), sep = "\t")
+ colnames(internal_AF) <- c("CHR", "POS", "REF", "ALT", "FILTER", "AC", "AN")
+internal_AF <- internal_AF %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT), 
+    AF = AC/AN)
+######### REMOVING VARIANTS WITH AC == 0 ###########
+print(paste0("Removing the variants which have an allele count of 0 after variant and sample QC, n = ", internal_AF %>% 
+filter(AC==0) %>% 
+pull(chr_pos_ref_alt) %>% 
+unique() %>% length()))
+
+vep_output <- vep_output %>% 
+mutate(chr_pos_ref_alt = gsub(":", "_", chr_pos_ref_alt)) %>%
+filter(chr_pos_ref_alt %in% (internal_AF %>%
+filter(AC !=0) %>% pull(chr_pos_ref_alt)))
+print(paste0("Returned variants from VEP with no AC ==0: ", length(unique(vep_output$chr_pos_ref_alt))))
+
 print("Filtering to the canonical transcript")
 # Filter to the canonical transcript
 vep_output_canonical <- vep_output %>% filter(CANONICAL == "YES" & SYMBOL == gene)
@@ -71,18 +92,12 @@ length(unique(vep_output_canonical$chr_pos_ref_alt))
 print("If multiple consequences per variant, filtering to the most severe")
 vep_output_canonical <- vep_output_canonical %>% mutate(Consequence_factor = factor(Consequence, levels = levels(vep_consequence), ordered = TRUE))
 vep_output_canonical$chr_pos_ref_alt <- gsub(':', '_', vep_output_canonical$chr_pos_ref_alt)
+
 annotated <- vep_output_canonical %>% 
 group_by(chr_pos_ref_alt) %>% 
 slice_min(Consequence_factor,with_ties = FALSE) %>%
 ungroup()
 length(unique(annotated$chr_pos_ref_alt))
-
-# Read in variant allele frequency 
-print(paste0("Reading in the internal Allele Frequency file from ", "~/edavyson/WGS_FADS/QC/", gene, "_QC_variants.tsv"))
-internal_AF <- read.table(paste0("~/edavyson/WGS_FADS/QC/", gene, "_QC_variants.tsv"), sep = "\t")
- colnames(internal_AF) <- c("CHR", "POS", "REF", "ALT", "FILTER", "AC", "AN")
-internal_AF <- internal_AF %>% mutate(chr_pos_ref_alt = paste0(CHR, "_", POS, "_", REF, "_", ALT), 
-    AF = AC/AN)
 
 print("Merging the VEP output with the UKB allele frequency file")
 annotated_internalAF <- merge(annotated, internal_AF, by = "chr_pos_ref_alt")
@@ -91,12 +106,6 @@ annotated_internalAF <- annotated_internalAF %>%
     meets_filter = ifelse(AF < 0.01 & (gnomADg_AF_nfe < 0.01 | gnomADg_AF_nfe == "-"), 
                           "Yes", "No")
   )
-print(paste0("Removing the variants which have an allele count of 0 after variant and sample QC, n = ", annotated_internalAF %>% 
-filter(AC==0) %>% 
-pull(chr_pos_ref_alt) %>% 
-unique() %>% length()))
-annotated_internalAF <- annotated_internalAF %>%
-filter(AC !=0)
 
 # Filter to rare variants 
 print("Filtering to rare variants based off UKB AF < 0.01 AND gnomAD AF < 0.01 (or absent in gnomAD)")
@@ -104,6 +113,8 @@ annotated_rare <- annotated_internalAF %>% filter(AF < 0.01 & (gnomADg_AF_nfe < 
 # Converting the CADD and REVEL scores to numerical variables
 annotated_rare$CADD_PHRED <- as.numeric(annotated_rare$CADD_PHRED)
 annotated_rare$REVEL <- as.numeric(annotated_rare$REVEL)
+
+########## PLOTTING ############
 
 ## Setting up plots directory 
 plot_dir <-paste0(getwd(), "/AC_overzero/", gene, "_priority_plots/")
@@ -222,6 +233,8 @@ table(annotated_rare$LoF)
 print("How many variants have a REVEL score > 0.5")
 table(annotated$REVEL > 0.5)
 
+############## PRIORITISED VARIANTS ##############
+
 print("Establishing a list of priority variants, i.e those which fit any one of the above criteria")
 priority <- annotated_rare %>%
   mutate(priority_criteria = case_when(
@@ -330,6 +343,8 @@ priority_AC_counts_barplot <- ggplot(priority_AC_counts, aes(x=range, y = n)) +
     width = 3000, height = 3000, res = 300, type = "cairo")
 priority_AC_counts_barplot
 dev.off()
+
+############## SAVING ###############
 
 ## Save the full list of priority variants with annotations 
 print(paste0("Saving the priority variants with annotation information to: ", file_dir, gene, "_priority_annot.tsv"))
