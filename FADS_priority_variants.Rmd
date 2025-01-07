@@ -26,8 +26,8 @@ FADS <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
 for (i in c(1:nrow(FADS))){
   gene <- FADS$hgnc_symbol[i]
   priority <- read.table(paste0("vep_res/AC_overzero/", gene, "_vepoutput_proc/", gene, "_priority_annot.tsv"), sep = "\t", header = T)
-  priority_mdd <- read.table(paste0("pri_variant_files/", gene, "_priority_var_mdd.tsv"), sep = "\t", header =T)
-  priority_metabol <- read.table(paste0("pri_variant_files/", gene, "_priority_var_metabol.tsv"), sep = "\t", header =T)
+  priority_mdd <- read.table(paste0("pri_variant_files/mdd_metabol_cohortvars/", gene, "_priority_var_mdd.tsv"), sep = "\t", header =T)
+  priority_metabol <- read.table(paste0("pri_variant_files/mdd_metabol_cohortvars/", gene, "_priority_var_metabol.tsv"), sep = "\t", header =T)
   pri_csq_mdd <- read.table(paste0("vep_res/AC_overzero_06_01/", gene, "_vepoutput_proc/", gene, "_priority_consequence_MDD_cohort.tsv"), sep = "\t", header = T)
   pri_csq_metabol <- read.table(paste0("vep_res/AC_overzero_06_01/", gene, "_vepoutput_proc/", gene, "_priority_consequence_Metabolite_cohort.tsv"), sep = "\t", header = T)
   pri_ACcounts_mdd <- read.table(paste0("vep_res/AC_overzero_06_01/", gene, "_vepoutput_proc/", gene, "_priorityACcounts_MDD_cohort.tsv"), sep = "\t", header = T)
@@ -38,6 +38,8 @@ for (i in c(1:nrow(FADS))){
   assign(paste0(gene, "_priority_metabol"), priority_metabol)
   assign(paste0(gene, "_priority_csq_mdd"), pri_csq_mdd)
   assign(paste0(gene, "_priority_csq_metabol"), pri_csq_metabol)
+  assign(paste0(gene, "_priority_ACcounts_mdd"), pri_ACcounts_mdd)
+  assign(paste0(gene, "_priority_ACcounts_metabol"), pri_ACcounts_metabol)
 }
 
 ```
@@ -54,17 +56,17 @@ table(FADS1_priority_var$chr_pos_ref_alt %in% FADS2_priority_var$chr_pos_ref_alt
 ## Consequence and AC plots of the prioritised variants 
 
 ```{r}
+####### Consequence plots 
+pri_csq_mdd_all <- rbind(FADS1_priority_csq_mdd, FADS2_priority_csq_mdd, FADS3_priority_csq_mdd, FEN1_priority_csq_mdd, MYRF_priority_csq_mdd, TMEM258_priority_csq_mdd) %>% mutate(cohort = paste0(cohort, "-cohort"), IMPACT = factor(IMPACT, levels = c("HIGH", "MODERATE", "MODIFIER", "LOW")))
 
-pri_csq_mdd_all <- rbind(FADS1_priority_csq_mdd, FADS2_priority_csq_mdd, FADS3_priority_csq_mdd, FEN1_priority_csq_mdd, MYRF_priority_csq_mdd, TMEM258_priority_csq_mdd) %>% mutate(cohort = paste0(cohort, " cohort"))
-
-pri_csq_metabol_all <- rbind(FADS1_priority_csq_metabol, FADS2_priority_csq_metabol, FADS3_priority_csq_metabol, FEN1_priority_csq_metabol, MYRF_priority_csq_metabol, TMEM258_priority_csq_metabol) %>% mutate(cohort = paste0(cohort, " cohort"))
+pri_csq_metabol_all <- rbind(FADS1_priority_csq_metabol, FADS2_priority_csq_metabol, FADS3_priority_csq_metabol, FEN1_priority_csq_metabol, MYRF_priority_csq_metabol, TMEM258_priority_csq_metabol) %>% mutate(cohort = paste0(cohort, "-cohort"), IMPACT = factor(IMPACT, levels = c("HIGH", "MODERATE", "MODIFIER", "LOW")))
 
 pri_csq_all <- rbind(pri_csq_mdd_all, pri_csq_metabol_all)
 
 custom_colors <- c("HIGH" = "red", "MODERATE" = "orange", "LOW" = "#90EE90", "MODIFIER" ="lightpink")
 
 
-mdd_cohort_priority <- ggplot(pri_csq_mdd_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = reorder(IMPACT, csq_count))) +
+mdd_cohort_priority <- ggplot(pri_csq_mdd_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = IMPACT)) +
   geom_bar(stat = 'identity') + 
  theme_bw() + 
 labs(x = "Consequence", y = "N", title = "Prioritised variants in the MDD cohort", 
@@ -75,7 +77,7 @@ geom_text(aes(label = csq_count), hjust = -0.1) +
 scale_fill_manual(values = custom_colors) + 
 facet_wrap(~GENE)
 
-metabolite_cohort_priority <- ggplot(pri_csq_metabol_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = reorder(IMPACT, csq_count))) +
+metabolite_cohort_priority <- ggplot(pri_csq_metabol_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = IMPACT)) +
   geom_bar(stat = 'identity') + 
  theme_bw() + 
 labs(x = "Consequence", y = "N", title = "Prioritised variants in the MDD cohort", 
@@ -86,16 +88,37 @@ geom_text(aes(label = csq_count), hjust = -0.1) +
 scale_fill_manual(values = custom_colors) + 
 facet_wrap(~GENE)
 
-all_cohort_pri_csq <- ggplot(pri_csq_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = reorder(IMPACT, csq_count))) +
+all_cohort_pri_csq <- ggplot(pri_csq_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = IMPACT)) +
   geom_bar(stat = 'identity') + 
  theme_bw() + 
 labs(x = "Consequence", y = "N", title = "Prioritised variants in the MDD and Metabolite cohort", 
 fill = "VEP IMPACT") +
 coord_flip() + 
 geom_text(aes(label = csq_count), hjust = -0.1) + 
- theme(legend.position = "top") + 
+ theme(legend.position = "top",
+       strip.text = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) + 
 scale_fill_manual(values = custom_colors) + 
-facet_grid(cohort~GENE)
+facet_grid(cohort ~ GENE)
+
+####### AC plots
+
+pri_ACcounts_all <- rbind(FADS1_priority_ACcounts_mdd, FADS2_priority_ACcounts_mdd, FADS3_priority_ACcounts_mdd, FEN1_priority_ACcounts_mdd, MYRF_priority_ACcounts_mdd, TMEM258_priority_ACcounts_mdd, FADS1_priority_ACcounts_metabol, FADS2_priority_ACcounts_metabol, FADS3_priority_ACcounts_metabol, FEN1_priority_ACcounts_metabol, MYRF_priority_ACcounts_metabol, TMEM258_priority_ACcounts_metabol)
+pri_ACcounts_all <- pri_ACcounts_all %>% mutate(range = factor(range, levels = c("1", "< 5", "< 10", "< 50", "< 100", "< 1000", "> 1000")), cohort = paste0(cohort, "-cohort"))
+
+ACcounts_graph <- ggplot(pri_ACcounts_all, aes(x=range, y = n)) + 
+  geom_bar(stat="identity", fill = "skyblue")+
+  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 3) + 
+  labs(x = "UKB Allele Count", y = "Count", title="UKB Allele Count (prioritised variants)") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        strip.text = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) + 
+  facet_grid(cohort ~ GENE)
+
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_csq_allgenes.png", all_cohort_pri_csq, width = 12, height = 10, device = "png", dpi= 300)
+
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_ACcounts_allgenes.png", ACcounts_graph, width = 12, height = 6, device = "png", dpi= 300)
 
 
 
@@ -197,7 +220,7 @@ mdd_mask_long <- mdd_mask_long %>% mutate(mask_label=factor(mask_label, levels =
 mask_numbers <- ggplot(mask_long %>% filter(Value == 1), aes(x = mask_label, fill = mask_label)) + 
   geom_bar(stat="count") + 
   facet_wrap(~GENE) + 
-  theme_minimal() + 
+  theme_bw() + 
   scale_fill_brewer(palette ="Set1") + scale_color_brewer(palette="Set1")+ 
   labs(x = "Mask", y = "Count", fill = "Mask Criteria") + 
   theme(
@@ -209,7 +232,7 @@ guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
 mdd_mask_numbers <- ggplot(mdd_mask_long %>% filter(Value == 1), aes(x = mask_label, fill = mask_label)) + 
   geom_bar(stat="count") + 
   facet_wrap(~GENE) + 
-  theme_minimal() + 
+  theme_bw() + 
   scale_fill_brewer(palette ="Set1") + scale_color_brewer(palette="Set1")+ 
   labs(x = "Mask", y = "Count", fill = "Mask Criteria", title = "MDD-cohort") + 
   theme(
@@ -221,7 +244,7 @@ guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
 metabol_mask_numbers <- ggplot(metabol_mask_long %>% filter(Value == 1), aes(x = mask_label, fill = mask_label)) + 
   geom_bar(stat="count") + 
   facet_wrap(~GENE) + 
-  theme_minimal() + 
+  theme_bw() + 
   scale_fill_brewer(palette ="Set1") + scale_color_brewer(palette="Set1")+ 
   labs(x = "Mask", y = "Count", fill = "Mask Criteria", title = "Metabolite-cohort") + 
   theme(
@@ -305,8 +328,8 @@ summarise_mask_counts <- function(dataframe, cohortlab) {
     Mask == "mask4" ~ "+CADD > 20",
     Mask == "mask5" ~ "+MODERATE IMPACT"
   ),
-  cohort = paste0(cohortlab, "_cohort"),
-  AF_Threshold = as.factor(AF_Threshold)
+  cohort = paste0(cohortlab, "-cohort"),
+  AF_Threshold = factor(AF_Threshold, levels = c("singleton", "0.01"))
     ) %>% 
     mutate(mask_label_factor = factor(mask_label,
                                          levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
@@ -315,24 +338,24 @@ summarise_mask_counts <- function(dataframe, cohortlab) {
 
 mdd_maskcounts <- summarise_mask_counts(mdd_mask_af_long, "MDD")
 metabolite_maskcounts <- summarise_mask_counts(metabol_mask_af_long, "Metabolite")
+maskcounts_all <- rbind(mdd_maskcounts, metabolite_maskcounts)
 
-mask_af_long$AF_Threshold <- factor(mask_af_long$AF_Threshold, levels = c("singleton", "0.0001", "0.001", "0.01"))
-mask_af_long <- mask_af_long %>% mutate(mask_label=factor(mask_label, levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
-
-mask_af_plt <- ggplot(mask_af_long %>% filter(Value ==1 & (AF_Threshold == 'singleton' | AF_Threshold == "0.01")), aes(x = AF_Threshold, fill = mask_label)) +
-  geom_bar(stat = "count", position = position_dodge(width=0.8)) +
- geom_text(stat="count", aes(label = after_stat(count), color = mask_label), vjust = -0.5, size = 3, show.legend = FALSE, position = position_dodge(width = 0.8)) +
+masks_bothcohorts <- ggplot(maskcounts_all, aes(x = AF_Threshold, y= count, fill = mask_label_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width=0.8)) +
+ geom_text(stat="identity", aes(label = count, color = mask_label_factor), vjust = -0.5, size = 3, show.legend = FALSE, position = position_dodge(width = 0.8)) +
 guides(color= guide_legend(label = FALSE)) +
-  facet_wrap(~GENE) +  # Facet by GENE
+  facet_grid(cohort~GENE) +  # Facet by GENE
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette="Set1")+
   labs(x = "AF Threshold", y = "Count", title = "", fill = "Mask Criteria") +
-  theme_minimal() +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        strip.text = element_text(size = 14, face = 'bold')) 
+        strip.text = element_text(size = 12),
+         plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) 
 
-ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_af_counts.png", mask_af_plt, width = 10, height = 6, device = "png", dpi= 300)
-mask_af_plt
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_af_counts.png", 
+masks_bothcohorts, width = 12, height = 6, device = "png", dpi= 300)
+masks_bothcohorts
 
 ```
 
@@ -356,7 +379,9 @@ mane_transcripts <- c("FADS1"="ENST00000350997",
                       "MYRF"="ENST00000278836",
                       "TMEM258"="ENST00000537328")
 
-## Saving genomic region variant objects of the genes 
+## Saving genomic region variant objects of the genes
+
+lolliplots <- function(cohort){
 for (i in c(1:nrow(FADS))) {
   gene <- FADS$hgnc_symbol[i]
   transcript <- mane_transcripts[[gene]] %>% as.character()
@@ -393,6 +418,15 @@ features$fill <-  c(ensembl$color_for_lolliplot)
 variant <- merge(variant, variant_zygosity %>% select(-c(CHR, POS, REF, ALT)), by = "chr_pos_ref_alt")
 variant <- variant %>% mutate(color_for_lolliplot_impact = case_when(IMPACT == "HIGH" ~ "red", IMPACT == "MODERATE" ~ "orange", IMPACT == "LOW" ~ "#90EE90", IMPACT == "MODIFIER" ~ "lightpink"))
 priority_gene <- priority_var_all %>% filter(SYMBOL == gene)
+  if(cohort == "MDD") {
+    mdd_variants <- read.table(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/pri_variant_files/mdd_metabol_cohortvars/", gene, "_priority_var_mdd.tsv"), sep = "\t", header=T)
+    priority_gene <- priority_gene %>% filter(chr_pos_ref_alt %in% mdd_variants$chr_pos_ref_alt)
+  }
+else if(cohort == "Metabolite") {
+  metabol_variants <- read.table(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/pri_variant_files/mdd_metabol_cohortvars/", gene, "_priority_var_metabol.tsv"), sep = "\t", header=T)
+  priority_gene <- priority_gene %>% filter(chr_pos_ref_alt %in% metabol_variants$chr_pos_ref_alt)
+  
+}
 # For each mask
 if (gene != "FEN1") {
 for (j in 1:5) {
@@ -431,8 +465,8 @@ sample.gr.0.01$node.label.cex <- 0.75
 sample.gr.0.01$node.label.cex <- 1
 }
 # Saving the 0.01 Mask
-print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"),
+print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar, label.parameter.label = sample.gr.0.01$node.label, lollipop_style_switch_limit = 0)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -463,8 +497,8 @@ sample.gr.singleton$node.label.cex <- 0.75
   text_gpar <- gpar(col="black")
 sample.gr.singleton$node.label.cex <- 1
 }
-print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"),
+print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.singleton, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -508,8 +542,8 @@ sample.gr.0.01$node.label.cex <- 0.75
 sample.gr.0.01$node.label.cex <- 1
 }
 # Saving the 0.01 Mask
-print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"),
+print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -540,8 +574,8 @@ sample.gr.singleton$node.label.cex <- 0.75
   text_gpar <- gpar(col="black")
 sample.gr.singleton$node.label.cex <- 1
 }
-print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"),
+print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.singleton, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -550,7 +584,11 @@ dev.off()
 }
 }
 }
+  print(paste0("All lolliplots for each gene and Mask for the", cohort, "-cohort"))
+}
 
+lolliplots("MDD")
+lolliplots("Metabolite")
 ```
 
 ## REGENIE Input
