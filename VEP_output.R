@@ -9,6 +9,8 @@ library(ggpubr)
 library(UpSetR)
 library(tidyr)
 library(optparse)
+library(grid)
+library(gridExtra)
 
 ######## OPTION SET UP  ##############
 parse <- OptionParser()
@@ -21,7 +23,7 @@ opt <- parse_args(OptionParser(option_list=option_list), args = args)
 
 gene <- opt$gene
 
-file_dir <-paste0(getwd(), "/AC_overzero_02_01/", gene, "_vepoutput_proc/")
+file_dir <-paste0(getwd(), "/AC_overzero_06_01/", gene, "_vepoutput_proc/")
 # Check if the directory exists
 if (!dir.exists(file_dir)) {
   # If it doesn't exist, create the directory
@@ -117,7 +119,7 @@ annotated_rare$REVEL <- as.numeric(annotated_rare$REVEL)
 ########## PLOTTING ############
 
 ## Setting up plots directory 
-plot_dir <-paste0(getwd(), "/AC_overzero/", gene, "_priority_plots/")
+plot_dir <-paste0(getwd(), "/AC_overzero_06_01/", gene, "_priority_plots/")
 # Check if the directory exists
 if (!dir.exists(plot_dir)) {
   # If it doesn't exist, create the directory
@@ -132,7 +134,7 @@ af_filter_plt <- ggplot(annotated_internalAF, aes(x = meets_filter)) + geom_bar(
 labs(x = "Variants with AF < 0.01 and gnomADg_AF_nfe < 0.01 or -", y = "Number of variants", title = gene) + 
 theme_minimal()
 
-  png(paste0(plot_dir, "AF_filter_", gene, ".png"), 
+png(paste0(plot_dir, "AF_filter_", gene, ".png"), 
     width = 3000, height = 2000, res = 300, type = "cairo")
 af_filter_plt
 dev.off()
@@ -258,7 +260,15 @@ priority <- annotated_rare %>%
          (IMPACT == "HIGH" | IMPACT == "MODERATE") |
          (REVEL >= 0.5))
 
-print(paste0("There are ", length(unique(priority$chr_pos_ref_alt)), " variants prioritised with at least one criteria for loss of function"))
+########### READ IN THE LIST OF VARAINTS WHICH ARE PRESENT IN EACH COHORT (MDD) and METABOLITE
+
+mdd_variants <- read.table(paste0("mdd_metabol_cohortvars/", gene, "_priority_var_mdd.tsv"), sep = "\t", header =T)
+metabol_variants <- read.table(paste0("mdd_metabol_cohortvars/", gene, "_priority_var_metabol.tsv"), sep = '\t', header = T)
+priority_mdd <- priority %>% filter(chr_pos_ref_alt %in% mdd_variants$chr_pos_ref_alt)
+priority_metabol <- priority %>% filter(chr_pos_ref_alt %in% metabol_variants$chr_pos_ref_alt)
+
+print(paste0("There are ", length(unique(priority_mdd$chr_pos_ref_alt)), " variants prioritised with at least one criteria for loss of function present in the MDD cohort"))
+print(paste0("There are ", length(unique(priority_metabol$chr_pos_ref_alt)), " variants prioritised with at least one criteria for loss of function present in the Metabolite cohort"))
 
 # What are the consequences annotated to the prioritised variants 
 csq_pri_plot <- ggplot(priority, aes(x = reorder(Consequence, table(Consequence)[Consequence]), 
@@ -273,22 +283,39 @@ print(paste0("Saving plot of VEP consequences to: ", plot_dir, "CSQ_priority", g
 csq_pri_plot
 dev.off()
 
+csq_summary <- function(priority_dataset, cohortlab) {
+  priority_dataset <- priority_dataset %>%
+  group_by(Consequence) %>%
+  summarise(csq_count = n(),
+  IMPACT = unique(IMPACT)) %>% 
+  mutate(cohort=cohortlab,
+  GENE=gene)
+  write.table(priority_dataset, paste0(file_dir, gene, "_priority_consequence_", cohortlab, "_cohort.tsv"), sep = "\t",
+  row.names = F, quote = F)
+return(priority_dataset)
+}
+
+csq_summary(priority_mdd, "MDD")
+csq_summary(priority_metabol, "Metabolite")
+
 # Create the list of annotations for the UpSetR plot (only those with variants)
-CADD_lst <- annotated_rare %>%
+
+upset_plot <- function(priority_dataset, cohortlab) {
+CADD_lst <- priority_dataset %>%
   filter(CADD_PHRED > 30) %>% 
   pull(chr_pos_ref_alt) %>% 
   unique()
 
-LoF_lst <- annotated_rare %>%
+LoF_lst <- priority_dataset %>%
   filter((LoF == "HC" | LoF == "OS")) %>% 
   pull(chr_pos_ref_alt) %>% 
   unique()
 
-VEP_IMPACT_lst <- annotated_rare %>%
+VEP_IMPACT_lst <- priority_dataset %>%
   filter((IMPACT == "HIGH" | IMPACT == "MODERATE")) %>% 
   pull(chr_pos_ref_alt) %>% 
   unique()
-REVEL_lst <- annotated_rare %>%
+REVEL_lst <- priority_dataset %>%
   filter(REVEL >= 0.5) %>% 
   pull(chr_pos_ref_alt) %>% 
   unique()
@@ -307,17 +334,46 @@ if (length(VEP_IMPACT_lst) > 0) {
 if (length(REVEL_lst) > 0) {
   VEP_annotations$REVEL <- REVEL_lst
 }
-print(paste0("Creating an Upset plot of the priority criteria, saved: ", plot_dir, "/UpSet_", gene, ".png"))
-upset_plt <- upset(fromList(VEP_annotations), nsets = length(VEP_annotations), set_size.show = TRUE, order.by = 'freq')
+print(paste0("Creating an Upset plot of the priority criteria, saved: ", plot_dir, "/UpSet_", gene, "_", cohortlab, ".png"))
 # Plot the Upset Plot
-png(paste0(plot_dir, "/UpSet_", gene, ".png"), 
-    width = 3200, height = 2000, res = 300, type = "cairo")
-upset_plt
+png(paste0(plot_dir, "/UpSet_", gene, "_", cohortlab, ".png"), width = 3200, height = 2000, res = 300, type = "cairo")
+print(upset(fromList(VEP_annotations), nsets = length(VEP_annotations), set_size.show = TRUE, order.by = 'freq'))
+grid.text(paste0(gene, ": Prioritised variants in the ", cohortlab, "-cohort "), x = 0.6, y = 0.97, gp = gpar(fontsize = 15))
 dev.off()
+}
+
+upset_plot(priority_mdd, "MDD")
+upset_plot(priority_metabol, "Metabolite")
 
 # What is the distribution of the allele count in UKB of the prioritised variants
-print('The distribution of Allele Count in the prioritised variants')
-table(priority$AC)
+print('The distribution of Allele Count in the prioritised variants in the MDD cohort')
+table(priority_mdd$AC)
+table(priority_metabol$AC)
+
+AC_counts <- function(priority_dataset, cohortlab) {
+priority_AC_counts <- priority_dataset %>% mutate(
+range = case_when(
+  AC == 1 ~ "1",
+  AC > 1 & AC < 5 ~ "< 5",
+  AC >= 5 & AC < 10 ~ "< 10",
+  AC >= 10 & AC < 50 ~ "< 50",
+  AC >= 50 & AC < 100 ~ "< 100",
+  AC >= 100 & AC < 1000 ~ "< 1000",
+  AC >= 1000 & AC < 10000 ~ "> 1000"
+)
+  ) %>%
+  count(range) %>% 
+  mutate(range = factor(range, levels = c("1", "< 5", "< 10", "< 50", "< 100", "< 1000", "> 1000")),
+  cohort = cohortlab,
+  GENE = gene)
+write.table(priority_AC_counts, paste0(file_dir, gene, "_priorityACcounts_", cohortlab, "_cohort.tsv"), sep = "\t",
+row.names=F, quote = F)
+return(priority_AC_counts)
+}
+
+AC_counts(priority_mdd, "MDD")
+AC_counts(priority_metabol, "Metabolite")
+
 priority_AC_counts <- priority %>% mutate(
 range = case_when(
   AC == 1 ~ "1",
