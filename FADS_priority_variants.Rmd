@@ -418,15 +418,6 @@ features$fill <-  c(ensembl$color_for_lolliplot)
 variant <- merge(variant, variant_zygosity %>% select(-c(CHR, POS, REF, ALT)), by = "chr_pos_ref_alt")
 variant <- variant %>% mutate(color_for_lolliplot_impact = case_when(IMPACT == "HIGH" ~ "red", IMPACT == "MODERATE" ~ "orange", IMPACT == "LOW" ~ "#90EE90", IMPACT == "MODIFIER" ~ "lightpink"))
 priority_gene <- priority_var_all %>% filter(SYMBOL == gene)
-  if(cohort == "MDD") {
-    mdd_variants <- read.table(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/pri_variant_files/mdd_metabol_cohortvars/", gene, "_priority_var_mdd.tsv"), sep = "\t", header=T)
-    priority_gene <- priority_gene %>% filter(chr_pos_ref_alt %in% mdd_variants$chr_pos_ref_alt)
-  }
-else if(cohort == "Metabolite") {
-  metabol_variants <- read.table(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/pri_variant_files/mdd_metabol_cohortvars/", gene, "_priority_var_metabol.tsv"), sep = "\t", header=T)
-  priority_gene <- priority_gene %>% filter(chr_pos_ref_alt %in% metabol_variants$chr_pos_ref_alt)
-  
-}
 # For each mask
 if (gene != "FEN1") {
 for (j in 1:5) {
@@ -465,8 +456,8 @@ sample.gr.0.01$node.label.cex <- 0.75
 sample.gr.0.01$node.label.cex <- 1
 }
 # Saving the 0.01 Mask
-print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"),
+print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar, label.parameter.label = sample.gr.0.01$node.label, lollipop_style_switch_limit = 0)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -497,8 +488,8 @@ sample.gr.singleton$node.label.cex <- 0.75
   text_gpar <- gpar(col="black")
 sample.gr.singleton$node.label.cex <- 1
 }
-print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"),
+print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.singleton, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -542,8 +533,8 @@ sample.gr.0.01$node.label.cex <- 0.75
 sample.gr.0.01$node.label.cex <- 1
 }
 # Saving the 0.01 Mask
-print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri_", cohort, ".png"),
+print(paste0("Saving the lolliplot of Mask", j, ".0.01 for", gene, "to ", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".0.01_lolliplot_variants_pri.png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.0.01, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -574,8 +565,8 @@ sample.gr.singleton$node.label.cex <- 0.75
   text_gpar <- gpar(col="black")
 sample.gr.singleton$node.label.cex <- 1
 }
-print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"))
-png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri_", cohort, ".png"),
+print(paste0("Saving the lolliplot of Mask", j, ".singleton for", gene, "to ", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"))
+png(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/", gene, "_Mask", j, ".singleton_lolliplot_variants_pri.png"),
     width = 4000, height = 1200, res = 300, type = "cairo")
 lolliplot(sample.gr.singleton, features, legend = legend, ylab = "Alt-heterozygous carriers in UKB Sample (N)", yaxis.gp = text_gpar)
 grid.text(paste0(gene, ":Mask", j, ".AF < 0.01"), x=.5, y=.8, just="top", 
@@ -584,11 +575,7 @@ dev.off()
 }
 }
 }
-  print(paste0("All lolliplots for each gene and Mask for the", cohort, "-cohort"))
-}
 
-lolliplots("MDD")
-lolliplots("Metabolite")
 ```
 
 ## REGENIE Input
