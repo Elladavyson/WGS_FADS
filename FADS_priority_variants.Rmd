@@ -26,8 +26,18 @@ FADS <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
 for (i in c(1:nrow(FADS))){
   gene <- FADS$hgnc_symbol[i]
   priority <- read.table(paste0("vep_res/AC_overzero/", gene, "_vepoutput_proc/", gene, "_priority_annot.tsv"), sep = "\t", header = T)
+  priority_mdd <- read.table(paste0("pri_variant_files/", gene, "_priority_var_mdd.tsv"), sep = "\t", header =T)
+  priority_metabol <- read.table(paste0("pri_variant_files/", gene, "_priority_var_metabol.tsv"), sep = "\t", header =T)
+  pri_csq_mdd <- read.table(paste0("vep_res/AC_overzero_06_01/", gene, "_vepoutput_proc/", gene, "_priority_consequence_MDD_cohort.tsv"), sep = "\t", header = T)
+  pri_csq_metabol <- read.table(paste0("vep_res/AC_overzero_06_01/", gene, "_vepoutput_proc/", gene, "_priority_consequence_Metabolite_cohort.tsv"), sep = "\t", header = T)
+  pri_ACcounts_mdd <- read.table(paste0("vep_res/AC_overzero_06_01/", gene, "_vepoutput_proc/", gene, "_priorityACcounts_MDD_cohort.tsv"), sep = "\t", header = T)
+   pri_ACcounts_metabol <- read.table(paste0("vep_res/AC_overzero_06_01/", gene, "_vepoutput_proc/", gene, "_priorityACcounts_Metabolite_cohort.tsv"), sep = "\t", header = T)
   print(paste0("Read in priority variants: ", gene, " (n=", nrow(priority), ")"))
   assign(paste0(gene, "_priority_var"), priority)
+  assign(paste0(gene, "_priority_mdd"), priority_mdd)
+  assign(paste0(gene, "_priority_metabol"), priority_metabol)
+  assign(paste0(gene, "_priority_csq_mdd"), pri_csq_mdd)
+  assign(paste0(gene, "_priority_csq_metabol"), pri_csq_metabol)
 }
 
 ```
@@ -40,6 +50,58 @@ Yes, they are all included
 ```{r}
 table(FADS1_priority_var$chr_pos_ref_alt %in% FADS2_priority_var$chr_pos_ref_alt)
 ```
+
+## Consequence and AC plots of the prioritised variants 
+
+```{r}
+
+pri_csq_mdd_all <- rbind(FADS1_priority_csq_mdd, FADS2_priority_csq_mdd, FADS3_priority_csq_mdd, FEN1_priority_csq_mdd, MYRF_priority_csq_mdd, TMEM258_priority_csq_mdd) %>% mutate(cohort = paste0(cohort, " cohort"))
+
+pri_csq_metabol_all <- rbind(FADS1_priority_csq_metabol, FADS2_priority_csq_metabol, FADS3_priority_csq_metabol, FEN1_priority_csq_metabol, MYRF_priority_csq_metabol, TMEM258_priority_csq_metabol) %>% mutate(cohort = paste0(cohort, " cohort"))
+
+pri_csq_all <- rbind(pri_csq_mdd_all, pri_csq_metabol_all)
+
+custom_colors <- c("HIGH" = "red", "MODERATE" = "orange", "LOW" = "#90EE90", "MODIFIER" ="lightpink")
+
+
+mdd_cohort_priority <- ggplot(pri_csq_mdd_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = reorder(IMPACT, csq_count))) +
+  geom_bar(stat = 'identity') + 
+ theme_bw() + 
+labs(x = "Consequence", y = "N", title = "Prioritised variants in the MDD cohort", 
+fill = "VEP IMPACT") +
+coord_flip() + 
+geom_text(aes(label = csq_count), hjust = -0.1) + 
+ theme(legend.position = "top") + 
+scale_fill_manual(values = custom_colors) + 
+facet_wrap(~GENE)
+
+metabolite_cohort_priority <- ggplot(pri_csq_metabol_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = reorder(IMPACT, csq_count))) +
+  geom_bar(stat = 'identity') + 
+ theme_bw() + 
+labs(x = "Consequence", y = "N", title = "Prioritised variants in the MDD cohort", 
+fill = "VEP IMPACT") +
+coord_flip() + 
+geom_text(aes(label = csq_count), hjust = -0.1) + 
+ theme(legend.position = "top") + 
+scale_fill_manual(values = custom_colors) + 
+facet_wrap(~GENE)
+
+all_cohort_pri_csq <- ggplot(pri_csq_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = reorder(IMPACT, csq_count))) +
+  geom_bar(stat = 'identity') + 
+ theme_bw() + 
+labs(x = "Consequence", y = "N", title = "Prioritised variants in the MDD and Metabolite cohort", 
+fill = "VEP IMPACT") +
+coord_flip() + 
+geom_text(aes(label = csq_count), hjust = -0.1) + 
+ theme(legend.position = "top") + 
+scale_fill_manual(values = custom_colors) + 
+facet_grid(cohort~GENE)
+
+
+
+```
+
+
 
 ## Generating the annotations file for REGENIE masks
 
@@ -101,7 +163,37 @@ mask_long <- priority_var_all %>% select(c(Gene, starts_with("mask"))) %>%
     Mask == "mask5" ~ "+MODERATE IMPACT"
   ))
 
-mask_long <- mask_long %>% mutate(mask_label=factor(mask_label, levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
+priority_var_mdd_list <- list(FADS1_priority_mdd, FADS2_priority_mdd, FADS3_priority_mdd, FEN1_priority_mdd, MYRF_priority_mdd, TMEM258_priority_mdd)
+priority_var_mdd_list <- lapply(priority_var_mdd_list, assign_masks)
+priority_var_mdd_all <- do.call(rbind, priority_var_mdd_list)
+mdd_mask_long <- priority_var_mdd_all %>% select(c(Gene, starts_with("mask"))) %>% 
+  pivot_longer(cols = starts_with("mask"), names_to = "Mask", values_to = "Value") %>% 
+  mutate(GENE = gene_symbols[Gene] %>% as.character()) %>% 
+  mutate(mask_label = case_when(
+    Mask == "mask1" ~ "LoF",
+    Mask == "mask2" ~ "+HIGH IMPACT",
+    Mask == "mask3" ~ "+REVEL > 0.5",
+    Mask == "mask4" ~ "+CADD > 20",
+    Mask == "mask5" ~ "+MODERATE IMPACT"
+  ))
+
+priority_var_metabol_list <- list(FADS1_priority_metabol, FADS2_priority_metabol, FADS3_priority_metabol, FEN1_priority_metabol, MYRF_priority_metabol, TMEM258_priority_metabol)
+priority_var_metabol_list <- lapply(priority_var_metabol_list, assign_masks)
+priority_var_metabol_all <- do.call(rbind, priority_var_metabol_list)
+metabol_mask_long <- priority_var_metabol_all %>% select(c(Gene, starts_with("mask"))) %>% 
+  pivot_longer(cols = starts_with("mask"), names_to = "Mask", values_to = "Value") %>% 
+  mutate(GENE = gene_symbols[Gene] %>% as.character()) %>% 
+  mutate(mask_label = case_when(
+    Mask == "mask1" ~ "LoF",
+    Mask == "mask2" ~ "+HIGH IMPACT",
+    Mask == "mask3" ~ "+REVEL > 0.5",
+    Mask == "mask4" ~ "+CADD > 20",
+    Mask == "mask5" ~ "+MODERATE IMPACT"
+  ))
+
+metabol_mask_long <- metabol_mask_long %>% mutate(mask_label=factor(mask_label, levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
+mdd_mask_long <- mdd_mask_long %>% mutate(mask_label=factor(mask_label, levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
+
 mask_numbers <- ggplot(mask_long %>% filter(Value == 1), aes(x = mask_label, fill = mask_label)) + 
   geom_bar(stat="count") + 
   facet_wrap(~GENE) + 
@@ -114,15 +206,43 @@ mask_numbers <- ggplot(mask_long %>% filter(Value == 1), aes(x = mask_label, fil
   ) + geom_text(stat="count", aes(label = after_stat(count), color = mask_label), vjust = -0.5, size = 3, show.legend = FALSE) +
 guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
 
-ggsave (filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_counts.png", mask_numbers, width = 10, height = 6, device = "png", dpi= 300)
+mdd_mask_numbers <- ggplot(mdd_mask_long %>% filter(Value == 1), aes(x = mask_label, fill = mask_label)) + 
+  geom_bar(stat="count") + 
+  facet_wrap(~GENE) + 
+  theme_minimal() + 
+  scale_fill_brewer(palette ="Set1") + scale_color_brewer(palette="Set1")+ 
+  labs(x = "Mask", y = "Count", fill = "Mask Criteria", title = "MDD-cohort") + 
+  theme(
+    axis.text.x = element_blank(),  # Remove x-axis tick labels
+    axis.ticks.x = element_blank()
+  ) + geom_text(stat="count", aes(label = after_stat(count), color = mask_label), vjust = -0.5, size = 3, show.legend = FALSE) +
+guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
+
+metabol_mask_numbers <- ggplot(metabol_mask_long %>% filter(Value == 1), aes(x = mask_label, fill = mask_label)) + 
+  geom_bar(stat="count") + 
+  facet_wrap(~GENE) + 
+  theme_minimal() + 
+  scale_fill_brewer(palette ="Set1") + scale_color_brewer(palette="Set1")+ 
+  labs(x = "Mask", y = "Count", fill = "Mask Criteria", title = "Metabolite-cohort") + 
+  theme(
+    axis.text.x = element_blank(),  # Remove x-axis tick labels
+    axis.ticks.x = element_blank()
+  ) + geom_text(stat="count", aes(label = after_stat(count), color = mask_label), vjust = -0.5, size = 3, show.legend = FALSE) +
+guides(color= guide_legend(label = FALSE)) + facet_wrap(~GENE)
+
+
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_counts.png", mask_numbers, width = 10, height = 6, device = "png", dpi= 300)
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_counts_mddcohort.png", mdd_mask_numbers, width = 10, height = 6, device = "png", dpi= 300)
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_counts_metabolcohort.png", metabol_mask_numbers, width = 10, height = 6, device = "png", dpi= 300)
 mask_numbers
 ```
 
 You can also divide masks by the Allele Frequency. There is always a singletons only mask, but can set other thresholds. For each mask, we can subdivide to all (< 0.01), those (< 0.0001) and singletons. 
 
 ```{r}
-priority_var_all <- 
-  priority_var_all %>% mutate(
+
+add_AF_masks <- function(dataframe) {
+  dataframe <- dataframe %>% mutate(
     mask1_0.01 = mask1,
     mask1_0.001 = ifelse(mask1 == 1 & AF < 0.001, 1, 0),
     mask1_0.0001 = ifelse(mask1 == 1 & AF < 0.0001, 1, 0),
@@ -145,10 +265,15 @@ priority_var_all <-
     mask5_singleton = ifelse(mask5 == 1 & AC == 1, 1,0)
   ) %>% 
   select(-c(mask1, mask2, mask3, mask4, mask5))
+return(dataframe)
+}
 
-mask_af_long <- 
-  priority_var_all %>% 
-  select(c(Gene, starts_with("mask"))) %>%
+priority_var_all <- add_AF_masks(priority_var_all)
+priority_var_mdd_all <- add_AF_masks(priority_var_mdd_all)
+priority_var_metabol_all <- add_AF_masks(priority_var_metabol_all)
+
+mask_longformat <- function(dataframe) {
+  dataframe <- dataframe %>% select(c(Gene, starts_with("mask"))) %>%
   pivot_longer(
     cols = starts_with("mask"),
     names_to = c("Mask", "AF_Threshold"),
@@ -163,6 +288,33 @@ mask_af_long <-
     Mask == "mask4" ~ "+CADD > 20",
     Mask == "mask5" ~ "+MODERATE IMPACT"
   ))
+  return(dataframe)
+}
+
+mask_af_long <- mask_longformat(priority_var_all)
+mdd_mask_af_long <- mask_longformat(priority_var_mdd_all)
+metabol_mask_af_long <- mask_longformat(priority_var_metabol_all)
+
+summarise_mask_counts <- function(dataframe, cohortlab) {
+  dataframe <- dataframe %>% filter(AF_Threshold == "singleton" | AF_Threshold == "0.01") %>% group_by(GENE, AF_Threshold, Mask) %>% 
+    filter(Value ==1) %>% 
+    summarise(count=n()) %>% mutate(mask_label = case_when(
+    Mask == "mask1" ~ "LoF",
+    Mask == "mask2" ~ "+HIGH IMPACT",
+    Mask == "mask3" ~ "+REVEL > 0.5",
+    Mask == "mask4" ~ "+CADD > 20",
+    Mask == "mask5" ~ "+MODERATE IMPACT"
+  ),
+  cohort = paste0(cohortlab, "_cohort"),
+  AF_Threshold = as.factor(AF_Threshold)
+    ) %>% 
+    mutate(mask_label_factor = factor(mask_label,
+                                         levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
+  return(dataframe)
+}
+
+mdd_maskcounts <- summarise_mask_counts(mdd_mask_af_long, "MDD")
+metabolite_maskcounts <- summarise_mask_counts(metabol_mask_af_long, "Metabolite")
 
 mask_af_long$AF_Threshold <- factor(mask_af_long$AF_Threshold, levels = c("singleton", "0.0001", "0.001", "0.01"))
 mask_af_long <- mask_af_long %>% mutate(mask_label=factor(mask_label, levels = c("LoF", "+HIGH IMPACT", "+REVEL > 0.5", "+CADD > 20", "+MODERATE IMPACT")))
@@ -466,7 +618,7 @@ mask4_0.01 <- mask4_0.01 %>% mutate(
 
 ggplot(mask4_0.01, aes(x = as.factor(most_deleterious), fill = as.factor(most_deleterious))) + geom_bar(stat="count") + facet_wrap(~inlovo)
 
-ggplot(mask4_0.01, aes(x = AC, fill = as.factor(most_deleterious))) + geom_bar(stat="count") + facet_wrap(~inlovo)
+ggplot(mask4_0.01, aes(x = as.factor(AC), fill = as.factor(most_deleterious))) + geom_bar(stat="count") + facet_wrap(~inlovo)
 
 ggplot(mask4_0.01, aes(x = POS, y = 5, color = as.factor(inlovo))) + geom_point()
 
