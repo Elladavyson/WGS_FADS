@@ -137,10 +137,16 @@ mutate(Mask1.0.01_status = "non-carrier",
 gene_carrier <- rbind(carriers %>% select(SAMPLE, status, GENE, Mask1.0.01_status, Mask2.0.01_status, Mask3.0.01_status, Mask4.0.01_status, Mask5.0.01_status,
 Mask1.singleton_status, Mask2.singleton_status, Mask3.singleton_status, Mask4.singleton_status, Mask5.singleton_status), non_carriers)
 participant_summary <- merge(participant_summary, gene_carrier, by = "SAMPLE")
+# Carrier information per Mask
+# Those carrying more than one variant are assigned to the mask of the most deleterious variant
     assign(paste0(gene, "_carriers"), gene_carrier)
+# Variant zygosity information
     assign(paste0(gene, "_variants"), zygosity)
+# Participant summary (number of variants carried etc)
     assign(paste0(gene, "_part_summary"), participant_summary)
-    assign(paste0(gene, "_part_genotype"), participant_geno_merge)
+# This is a table of the participant genotypes 
+# For participants carrying > 1 variant, they are in the long format (1 row per variant carried)
+    assign(paste0(gene, "_part_genotype"), participant_geno_all)
 }
 
 
@@ -971,8 +977,8 @@ for (i in c(1:nrow(fads_genes))){
   gene <- fads_genes$hgnc_symbol[i]
   priority <- read.table(paste0(gene, "_priority_annot.tsv"), sep = "\t", header = T)
   print(paste0("Read in priority variants: ", gene, " (n=", nrow(priority), ")"))
-  part_genotype_mdd <- part_genotype_all %>% filter(SAMPLE %in% mdd$IID)
-  part_genotype_metabol <- part_genotype_all %>% filter(SAMPLE %in% metabol$IID)
+  part_genotype_mdd <- part_genotype_all %>% filter(gene == gene) %>% filter(SAMPLE %in% mdd$IID)
+  part_genotype_metabol <- part_genotype_all %>% filter(gene == gene) %>% filter(SAMPLE %in% metabol$IID)
   mdd_variants <- c(part_genotype_mdd$het_variants, part_genotype_mdd$hom_variants) %>% unique()
   metabol_variants <- c(part_genotype_metabol$het_variants, part_genotype_metabol$hom_variants) %>% unique()
   priority_mdd <- priority %>% filter(chr_pos_ref_alt %in% mdd_variants)
@@ -981,5 +987,6 @@ for (i in c(1:nrow(fads_genes))){
   write.table(priority_metabol, paste0(gene, "_priority_var_metabol.tsv"), sep = "\t", row.names = F, quote = F)
   assign(paste0(gene, "_priority_var_mdd"), priority_mdd)
   assign(paste0(gene, "_priority_var_metabol"), priority_metabol)
+  assign(paste0(gene, "_priority_var"), priority)
 }
 
