@@ -26,6 +26,7 @@ library(caret) # Have to install
 # dx download /Output/regenie/input/annotations_FADS.tsv
 # dx download /Output/regenie/input/masks_FADS.txt
 # dx download /Output/regenie/input/aaf_FADS.tsv
+# dx download /Output/gene_VCF_variants/variants/pri_variants/VEP/*
 
 # Looking at explicitly FADS1 Mask4 0.01 and FADS1 Mask 5 0.01
 # Also look at TMEM258 for Mask4 Singletons and Mask5 singletons to see the differences in distributions
@@ -207,7 +208,7 @@ summarise(Count = n(), .groups = "drop")
 carrier_types_plt_permask_mdd <- ggplot(part_carriers_summary_mdd %>% filter(Carrier_status == "carrier"), aes(x = Mask, y = Count, fill = carrier_type))+ 
     geom_bar(stat="identity", position = "dodge") + facet_wrap(~GENE) + 
     geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
-    theme_minimal() + 
+    theme_bw() + 
     labs(x = "Mask", y = "Number of Carriers", fill = "Carrier type", title = "MDD-cohort") + guides(color= guide_legend(label = FALSE)) +
     theme(
         axis.text.x = element_text(angle = 45, hjust = 1),
@@ -218,17 +219,43 @@ carrier_types_plt_permask_mdd <- ggplot(part_carriers_summary_mdd %>% filter(Car
 carrier_types_plt_permask_metabolite <- ggplot(part_carriers_summary_metabol %>% filter(Carrier_status == "carrier"), aes(x = Mask, y = Count, fill = carrier_type))+ 
     geom_bar(stat="identity", position = "dodge") + facet_wrap(~GENE) + 
     geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
-    theme_minimal() + 
+    theme_bw() + 
     labs(x = "Mask", y = "Number of Carriers", fill = "Carrier type", title = "Metabolite-cohort") + guides(color= guide_legend(label = FALSE)) +
     theme(
         axis.text.x = element_text(angle = 45, hjust = 1),
         plot.title = element_text(hjust = 0.5, face = "bold"))
 
+##### Summary of carriers/non carriers overall (no masks)
+part_carriers_cohort <- rbind(part_carriers_summary_metabol  %>% mutate(cohort = "Metabolite-cohort"),
+part_carriers_summary_mdd  %>% mutate(cohort = "MDD-cohort"))
+
+part_carriers_cohort_plt <- ggplot(part_carriers_cohort %>% filter(Carrier_status == "carrier"), aes(x = Mask, y = Count, fill = carrier_type))+ 
+    geom_bar(stat="identity", position = "dodge") + 
+    geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
+    theme_bw() + 
+    labs(x = "Mask", y = "Number of Carriers", fill = "Carrier type", title = "Carrier types per mask") + guides(color= guide_legend(label = FALSE)) +
+    theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        strip.text = element_text(size = 12),
+        legend.position="top") +
+        facet_grid(GENE~cohort)
+
+part_carriers_gene_nomask_plt <- ggplot(part_carriers_cohort %>% filter(Mask == "Mask5.0.01" & Carrier_status == "carrier"), aes(x = GENE, y = Count, fill = carrier_type))+ 
+geom_bar(stat="identity", position = "dodge") + 
+geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
+ theme_bw() + 
+labs(x = "Gene", y = "Number of Carriers", fill = "Carrier type", title = "Number of carriers per gene") + guides(color= guide_legend(label = FALSE)) +
+theme(
+  axis.text.x = element_text(angle = 45, hjust = 1),
+   plot.title = element_text(hjust = 0.5, face = "bold"),
+   strip.text = element_text(size = 12),
+   legend.position = "top") +
+ facet_wrap(~cohort)
+
+
 #### Saving the plots 
-ggsave(filename ="carrier_types_genes_permask_AF_cohorts.png", 
-ggarrange(carrier_types_plt_permask_mdd, 
-carrier_types_plt_permask_metabolite, 
-common.legend = T, nrow = 2, ncol =1, legend = "right"), width = 12, height = 6, device = "png", dpi = 300)
+ggsave(filename ="carrier_types_genes_permask_AF_cohorts.png", part_carriers_cohort_plt, width = 8.27, height = 11.69, device = "png", dpi = 300)
 
 ggsave(filename ="carrier_types_genes_permask_AF_mddcohort.png", 
 carrier_types_plt_permask_mdd, width = 12, height = 6, device = "png", dpi = 300)
@@ -348,14 +375,14 @@ png(paste0("UpSet_privar_carriers_genes_mdd.png"),
     width = 3200, height = 2000, res = 300, type = "cairo")
 upset(fromList(carriers_across_genes_mdd), nsets = length(carriers_across_genes_mdd),
 set_size.show = TRUE, order.by = 'freq')
-grid.text("MDD-cohort", x = 0.5, y = 0.97, gp = gpar(fontsize = 20))
+grid.text("MDD-cohort: Carriers of prioritised variants in FADS genes", x = 0.6, y = 0.97, gp = gpar(fontsize = 14))
 dev.off()
 
 png(paste0("UpSet_privar_carriers_genes_metabol.png"), 
     width = 3200, height = 2000, res = 300, type = "cairo")
 upset(fromList(carriers_across_genes_metabol), nsets = length(carriers_across_genes_metabol),
 set_size.show = TRUE, order.by = 'freq')
-grid.text("Metabolite-cohort", x = 0.5, y = 0.97, gp = gpar(fontsize = 20))
+grid.text("Metabolite-cohort: Carriers of prioritised variants in FADS genes", x = 0.6, y = 0.97, gp = gpar(fontsize = 14))
 dev.off()
 
 ggsave(filename ="carrier_types_genes_permask_AF.png", carrier_types_plt_permask, width = 12, height = 6, device = "png", dpi = 300)
@@ -967,6 +994,63 @@ plot_list <- lapply(metabolites, function(metabolite) {
 })
   })
 
+########## Manually plotting FADS1 carriers and non carriers meabolite levels separated by MDD 
+
+    norm_metabolite_carriers <- norm_metabolite_carriers %>%
+        mutate(across(
+    all_of(mask_columns), 
+    ~ factor(., levels = c("carrier", "non-carrier"))
+  ))
+
+violin_meta_dists_mdd <- function(gene, metabolite, mask) {
+    # Filter out NA values for the gene status column
+    norm_metabolite <- norm_metabolite_carriers %>% 
+        filter(GENE == gene) %>%
+        mutate(across(
+    all_of(mask_columns), 
+    ~ factor(., levels = c("carrier", "non-carrier"))
+  ))
+    # Get the relevant ttest result
+    metabolitename <- get_metabolitename(metabolite)
+    genename <- gene
+    maskname <- mask
+    plt <- ggplot(norm_metabolite, aes(x = as.factor(MajDepr), 
+                                       y = !!sym(metabolite),
+                                       color = as.factor(MajDepr), 
+                                       fill = as.factor(MajDepr))) + 
+        geom_violin(trim = FALSE, na.rm = TRUE, alpha = 0.3) +
+        scale_color_brewer(palette = "Set2", aesthetics = c("colour", "fill"), 
+                           labels = c("Carrier", "Non-carrier"), 
+                           name = "Prioritised variant in gene") + 
+        theme_classic() +
+        facet_wrap(~Mask5.0.01_status) +
+        geom_jitter(shape = 16, position = position_jitter(0.2), na.rm = TRUE) +
+        stat_summary(fun.data = data_summary, shape = 23, color = "black", na.rm = TRUE) + 
+        labs(title ="", 
+             x = "MDD status", 
+             y =   'Normalised measure') + 
+        scale_x_discrete(labels = c("Controls", "Cases")) +
+        theme(legend.position = "none", 
+              text = element_text(size = 9))
+
+    return(plt)
+}
+
+mdd_mask5_plots_FADS1 <- list()
+for(i in 1:length(metabolites)) {
+  metabolite <- metabolites[i]
+  mdd_mask5_plots_FADS1[[i]] <- violin_meta_dists_mdd("FADS1", metabolite, "Mask5.0.01_status")
+  
+}
+FADS1_mask5_mddshort <- ggarrange(plotlist = mdd_mask5_plots_FADS1, 
+                             nrow = 3, 
+                             ncol = 2, 
+                             labels = sapply(metabolites, get_metaboliteshort))
+  ggsave(filename =  "FADS1_meta_hists_carriers_mask50.01_mdd.png", 
+         plot = annotate_figure(FADS1_mask5_mddshort, top = text_grob("FADS1: prioritised variant carriers (Mask 5) and MDD status", size = 14, face = "bold")),
+         width = 8, height = 10, device = "png", dpi = 300)
+
+
 ########## Getting variant summaries for the prioritised variants in the MDD cohort and metabolite cohort
 
 # Read in the priority variant tables 
@@ -990,3 +1074,54 @@ for (i in c(1:nrow(fads_genes))){
   assign(paste0(gene, "_priority_var"), priority)
 }
 
+priority_var_mdd_all <- rbind(FADS1_priority_var_mdd, FADS2_priority_var_mdd, FADS3_priority_var_mdd, FEN1_priority_var_mdd, MYRF_priority_var_mdd, TMEM258_priority_var_mdd)
+priority_var_metabol_all <- rbind(FADS1_priority_var_metabol, FADS2_priority_var_metabol, FADS3_priority_var_metabol, FEN1_priority_var_metabol, MYRF_priority_var_metabol, TMEM258_priority_var_metabol) %>% 
+mutate(cohort = "Metabolite-cohort")
+
+priority_var_counts <- rbind(priority_var_mdd_all %>% group_by(SYMBOL) %>% 
+summarise(count = n()) %>% mutate(cohort = "MDD-cohort"),
+priority_var_metabol_all %>% group_by(SYMBOL) %>% 
+summarise(count= n()) %>% mutate(cohort = "Metabolite-cohort"))
+
+pri_var_counts_plt <- ggplot(priority_var_counts, aes(x = SYMBOL, y = count))+ 
+geom_bar(stat="identity", position = "dodge", fill = "darkgreen") + 
+geom_text(stat = "identity", aes(label = count), color = "black", position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
+ theme_bw() + 
+labs(x = "Gene", y = "Number of Variants", fill = "Carrier type", title = "Number of prioritised variants per gene") + guides(color= guide_legend(label = FALSE)) +
+theme(
+  axis.text.x = element_text(angle = 45, hjust = 1),
+   plot.title = element_text(hjust = 0.5, face = "bold"),
+   strip.text = element_text(size = 12)) +
+ facet_wrap(~cohort)
+
+carriers_variants_n <- rbind(part_carriers_cohort %>% 
+filter(Mask == "Mask5.0.01" & Carrier_status == "carrier") %>% 
+select(-c(Carrier_status, Mask)) %>% mutate(type = "Carriers"),
+priority_var_counts %>% mutate(carrier_type = NA, type = "Variants") %>% 
+rename(Count = count,
+GENE=SYMBOL)) %>% mutate(type = factor(type, levels = c("Variants", "Carriers")))
+
+ var_carriers_plt<- ggplot(carriers_variants_n, aes(x = GENE, y = Count, fill = carrier_type))+ 
+  geom_bar(stat="identity", position = "dodge") + 
+  geom_text(stat = "identity", aes(label = Count, color = carrier_type), position = position_dodge(width = 1), vjust = -0.5, size = 3, show.legend = FALSE) +
+ theme_bw() + 
+labs(x = "Gene", y = "Count", fill = "Carrier type", title = "Number of prioritised variants and carriers per gene") + guides(color= guide_legend(label = FALSE)) +
+ theme(
+   plot.title = element_text(hjust = 0.5, face = "bold"),
+ strip.text = element_text(size = 12),
+legend.position = "top") +
+facet_grid(type~cohort) +
+scale_fill_manual(values = c("#F8766D", "#00BA38", "#619CFF"),
+breaks=c("Alternate heterozgyous","Compound heterozygous" , "Alternate homozygous")) + 
+scale_color_manual(values = c("#F8766D" ,"#00BA38", "#619CFF"), 
+breaks=c("Alternate heterozgyous","Compound heterozygous" , "Alternate homozygous")) 
+
+
+ggsave(filename ="carriers_variants_pergene.png", 
+
+ var_carriers_plt, width = 8, height = 8, device = "png", dpi = 300)
+
+ggsave(filename ="carriers_variants_pergene_option2.png", 
+
+ ggarrange(pri_var_counts_plt,part_carriers_gene_nomask_plt, nrow = 2, ncol = 1), 
+ width = 8, height = 10, device = "png", dpi = 300)
