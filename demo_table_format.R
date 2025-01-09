@@ -29,5 +29,9 @@ process_demo <- function(table) {
 
 demo_both <- rbind(mdd_demo, metabol_demo)
 demo_both <- demo_both %>% select(cohort, everything())
-View(process_demo(demo_both))
+View(t(process_demo(demo_both)) %>% as.data.frame())
+
+### Chi squared MDD results 
+
+mdd_chi <- read.table("all_carriers_mdd_chisq_results_permask.tsv", sep = "\t", header = T)
 

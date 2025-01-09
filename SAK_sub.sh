@@ -411,10 +411,10 @@ dx run swiss-army-knife \
 ####### Running REGENIE step 2 using SAK (REGENIE VERSION 3.1.1)
 
 dx run swiss-army-knife \
-  -icmd="bash regenie_step2.sh TMEM258" \
-  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bed" \
-  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bim" \
-  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.fam" \
+  -icmd="bash regenie_step2.sh FADS2" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS2_varqc_sampqc_HWE_combined.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS2_varqc_sampqc_HWE_combined.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS2_varqc_sampqc_HWE_combined.fam" \
   -iin="/Output/regenie/ukb_unrel_eur_metabol.pheno" \
   -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
   -iin="/Output/regenie/input/annotations_FADS.tsv" \
@@ -428,9 +428,9 @@ dx run swiss-army-knife \
   -iin="/Output/regenie/input/metabolite_regenie_step1_5.loco.gz" \
   -iin="/Output/regenie/input/metabolite_regenie_step1_pred.list" \
   -iin="/Code/regenie_step2.sh" \
-  --tag="regenie step 2 TMEM258" \
+  --tag="regenie step 2 FADS2" \
   --instance-type "mem1_ssd1_v2_x16" \
-  --destination="/Output/regenie/step2_res/version3.2.6/" \
+  --destination="/Output/regenie/step2_res/version3.2.6/metabolite/minMAC/" \
   --brief --yes
 
 ######## REGENIE QC of MDD 
@@ -457,12 +457,12 @@ dx run swiss-army-knife \
 ## REGENIE STEP 1 MDD
 
  regenie_step1_mdd="regenie --step 1\
- --lowmem --out mdd_regenie_step1_BT --bed ukb22418_c1_22_v2_merged\
+ --lowmem --out mdd_regenie_step1_BT_nospectrometer --bed ukb22418_c1_22_v2_merged\
  --phenoFile ukb_unrel_eur_pgc3_mdd.pheno --covarFile ukb_unrel_eur_covars.covar\
  --extract WGS_array_snps_qc_pass_pgc3_mdd.snplist\
  --phenoCol MajDepr \
- --covarColList Age,sex_coded,genotype_array,AC,spectrometer,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10\
- --catCovarList AC,spectrometer\
+ --covarColList Age,sex_coded,genotype_array,AC,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10 \
+ --catCovarList AC \
  --maxCatLevels 23\
  --bt \
  --firth --approx \
@@ -485,22 +485,22 @@ dx run swiss-army-knife \
 
 
 dx run swiss-army-knife \
-  -icmd="bash regenie_mdd_step2.sh FEN1" \
-  -iin="/Output/regenie/input/WGS_BEDS/FEN1_varqc_sampqc_HWE_combined.bed" \
-  -iin="/Output/regenie/input/WGS_BEDS/FEN1_varqc_sampqc_HWE_combined.bim" \
-  -iin="/Output/regenie/input/WGS_BEDS/FEN1_varqc_sampqc_HWE_combined.fam" \
+  -icmd="bash regenie_mdd_step2.sh TMEM258" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.fam" \
   -iin="/Output/regenie/ukb_unrel_eur_pgc3_mdd.pheno" \
   -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
   -iin="/Output/regenie/input/annotations_FADS.tsv" \
   -iin="/Output/regenie/input/masks_FADS.txt" \
   -iin="/Output/regenie/input/aaf_FADS.tsv" \
   -iin="/Output/regenie/input/setlist_FADS.tsv" \
-  -iin="/Output/regenie/input/mdd_regenie_step1_BT_1.loco.gz" \
-  -iin="/Output/regenie/input/mdd_regenie_step1_BT_pred.list" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_BT_nospectrometer_1.loco.gz" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_BT_nospectrometer_pred.list" \
   -iin="/Code/regenie_mdd_step2.sh" \
-  --tag="regenie step 2 MDD FEN1" \
+  --tag="regenie step 2 MDD TMEM258" \
   --instance-type "mem1_ssd1_v2_x16" \
-  --destination="/Output/regenie/step2_res/version3.2.6/MDD/bt_pred/" \
+  --destination="/Output/regenie/step2_res/version3.2.6/MDD/bt_pred_nospectrometer/" \
   --brief --yes
 
 # LOVO run FOR mask 4 0.01
@@ -516,12 +516,12 @@ dx run swiss-army-knife \
   -iin="/Output/regenie/input/masks_FADS.txt" \
   -iin="/Output/regenie/input/aaf_FADS.tsv" \
   -iin="/Output/regenie/input/setlist_FADS.tsv" \
-  -iin="/Output/regenie/input/mdd_regenie_step1_1.loco.gz" \
-  -iin="/Output/regenie/input/mdd_regenie_step1_pred.list" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_BT_nospectrometer_1.loco.gz" \
+  -iin="/Output/regenie/input/mdd_regenie_step1_BT_nospectrometer_pred.list" \
   -iin="/Code/regenie_mdd_lovo.sh" \
   --tag="regenie step 2 MDD LOVO FADS1" \
   --instance-type "mem1_ssd1_v2_x16" \
-  --destination="/Output/regenie/step2_res/version3.2.6/MDD/" \
+  --destination="/Output/regenie/step2_res/version3.2.6/MDD/lovo/" \
   --brief --yes
 
  ## LD heatmaps
