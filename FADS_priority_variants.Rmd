@@ -88,16 +88,17 @@ geom_text(aes(label = csq_count), hjust = -0.1) +
 scale_fill_manual(values = custom_colors) + 
 facet_wrap(~GENE)
 
-all_cohort_pri_csq <- ggplot(pri_csq_all, aes(x = reorder(Consequence, csq_count), y = csq_count, fill = IMPACT)) +
+all_cohort_pri_csq <- ggplot(pri_csq_all %>% filter(csq_count > 1), aes(x = reorder(Consequence, csq_count), y = csq_count, fill = IMPACT)) +
   geom_bar(stat = 'identity') + 
  theme_bw() + 
-labs(x = "Consequence", y = "N", title = "Prioritised variants in the MDD and Metabolite cohort", 
+labs(x = "Consequence", y = "N", title = "", 
 fill = "VEP IMPACT") +
 coord_flip() + 
-geom_text(aes(label = csq_count), hjust = -0.1) + 
+geom_text(aes(label = csq_count), hjust = -0.1, size = 3) + 
  theme(legend.position = "top",
        strip.text = element_text(size = 12),
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) + 
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+      axis.text.x = element_text(angle = 45, hjust = 1) ) + 
 scale_fill_manual(values = custom_colors) + 
 facet_grid(cohort ~ GENE)
 
@@ -109,17 +110,19 @@ pri_ACcounts_all <- pri_ACcounts_all %>% mutate(range = factor(range, levels = c
 ACcounts_graph <- ggplot(pri_ACcounts_all, aes(x=range, y = n)) + 
   geom_bar(stat="identity", fill = "skyblue")+
   geom_text(aes(label = n), vjust = -0.5, color = "black", size = 3) + 
-  labs(x = "UKB Allele Count", y = "Count", title="UKB Allele Count (prioritised variants)") + 
+  labs(x = "UKB Allele Count", y = "Count", title="") + 
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        strip.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12),
+        strip.text.y = element_text(size = 7),
         plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) + 
   facet_grid(cohort ~ GENE)
 
-ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_csq_allgenes.png", all_cohort_pri_csq, width = 12, height = 10, device = "png", dpi= 300)
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_csq_allgenes_over1.png", all_cohort_pri_csq, width = 12, height = 10, device = "png", dpi= 300)
 
 ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_ACcounts_allgenes.png", ACcounts_graph, width = 12, height = 6, device = "png", dpi= 300)
 
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_subplots.png", ggarrange(all_cohort_pri_csq, ACcounts_graph, ncol = 1, nrow = 2), width = 14, height = 14, device = "png", dpi= 300)
 
 
 ```
@@ -342,20 +345,28 @@ maskcounts_all <- rbind(mdd_maskcounts, metabolite_maskcounts)
 
 masks_bothcohorts <- ggplot(maskcounts_all, aes(x = AF_Threshold, y= count, fill = mask_label_factor)) +
   geom_bar(stat = "identity", position = position_dodge(width=0.8)) +
- geom_text(stat="identity", aes(label = count, color = mask_label_factor), vjust = -0.5, size = 3, show.legend = FALSE, position = position_dodge(width = 0.8)) +
+ geom_text(stat="identity", aes(label = count, color = mask_label_factor), vjust = -0.5, size = 2.5, show.legend = FALSE, position = position_dodge(width = 0.8)) +
 guides(color= guide_legend(label = FALSE)) +
   facet_grid(cohort~GENE) +  # Facet by GENE
-  scale_fill_brewer(palette = "Set1") +
-  scale_color_brewer(palette="Set1")+
+  scale_fill_brewer(palette = "Set2") +
+  scale_color_brewer(palette="Set2")+
   labs(x = "AF Threshold", y = "Count", title = "", fill = "Mask Criteria") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        strip.text = element_text(size = 12),
-         plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) 
+        strip.text.x = element_text(size = 12),
+        strip.text.y = element_text(size = 6.5),
+         plot.title = element_text(hjust = 0.5, face = "bold", size = 14), legend.position = "top")
 
 ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_af_counts.png", 
 masks_bothcohorts, width = 12, height = 6, device = "png", dpi= 300)
 masks_bothcohorts
+
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants__masks_subplots.png", ggarrange(ACcounts_graph, masks_bothcohorts, ncol = 1, nrow = 2, labels = c("A", "B")), width = 8.27, height = 11.69, device = "png", dpi= 300)
+
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_csq_AC_masks_subplots.png", ggarrange(all_cohort_pri_csq, ACcounts_graph, masks_bothcohorts, ncol = 1, nrow = 3, labels = c("A", "B", "C"), heights = c(0.4, 0.3, 0.3)), width = 8.27, height = 11.69, device = "png", dpi= 300)
+
+
+ggarrange(all_cohort_pri_csq, masks_bothcohorts)
 
 ```
 
