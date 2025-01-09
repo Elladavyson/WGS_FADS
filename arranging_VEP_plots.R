@@ -4,18 +4,16 @@ library(grid)
 library(ggplot2)
 
 FADS <- read.table("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
+
 for (gene in FADS$hgnc_symbol) {
   print(gene)
-  
-# FADS1 
-imgA=png::readPNG(paste0(gene, "_priority_plots/UpSet_", gene, ".png"))
-imgB=png::readPNG(paste0(gene, "_priority_plots/CSQ_priority", gene, ".png"))
-imgC=png::readPNG(paste0(gene, "_priority_plots/AC_hist_prioritised", gene, ".png"))
-
+  vep_plotdir <- file.path("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/vep_res/AC_overzero_06_01/")
+  # FADS1 
+  imgA=png::readPNG(paste0(vep_plotdir, gene, "_priority_plots/UpSet_", gene, "_MDD.png"))
+  imgB=png::readPNG(paste0(vep_plotdir, gene, "_priority_plots/UpSet_", gene, "_Metabolite.png"))
 # Convert images to grobs
 grobA <- rasterGrob(imgA, interpolate = TRUE)
 grobB <- rasterGrob(imgB, interpolate = TRUE)
-grobC <- rasterGrob(imgC, interpolate = TRUE)
 
 add_label <- function(grob, label) {
   label_grob <- textGrob(
@@ -29,7 +27,6 @@ add_label <- function(grob, label) {
 # Add labels to each plot
 labeledA <- add_label(grobA, "A)")
 labeledB <- add_label(grobB, "B)")
-labeledC <- add_label(grobC, "C)")
 
 # Create a title
 title <- textGrob(
@@ -42,11 +39,31 @@ plot_dir <- "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/"
 # Arrange title and plots
 pdf(paste0(plot_dir, gene, "_vep_priority_arranged.pdf"), width = 8.27, height = 11.69) # A4 dimensions
 grid.arrange(
-  title, labeledA, labeledB, labeledC,
-  ncol = 1, heights = c(0.04, 0.32, 0.32, 0.32) # Adjust heights for title and plots
+  title, labeledA, labeledB,
+  ncol = 1, heights = c(0.04, 0.48, 0.48) # Adjust heights for title and plots
 )
 dev.off()
 }
+
+## Cross carriers plot
+
+plot_dir <- "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/"
+mddcohort <- png::readPNG(file.path(plot_dir, "UpSet_privar_carriers_genes_mdd.png"))
+metabolcohort <- png::readPNG(file.path(plot_dir, "UpSet_privar_carriers_genes_metabol.png"))
+mddcohort <- rasterGrob(mddcohort, interpolate =TRUE)
+metabolcohort <- rasterGrob(metabolcohort, interpolate = TRUE)
+title=textGrob(
+  paste0("UpSet plots of carriers of prioritised variants"), 
+  gp = gpar(fontsize = 17, fontface = "bold"), 
+  x = 0.5, hjust = 0.5
+)
+pdf(paste0(plot_dir, "pri_crosscarriers.pdf"), width = 8.27, height = 11.69) # A4 dimensions
+grid.arrange(
+  title, add_label(mddcohort, "A"), add_label(metabolcohort, "B"),
+  ncol = 1, heights = c(0.04, 0.48, 0.48) # Adjust heights for title and plots
+)
+dev.off()
+
 
 # Lolliplot subplots for different masks in each gene
 
