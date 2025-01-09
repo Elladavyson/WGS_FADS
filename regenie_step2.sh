@@ -25,6 +25,7 @@ regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
   --catCovarList AC,spectrometer \
   --maxCatLevels 23 \
   --firth --approx \
+  --minMAC 1 \
   --pred basename_metabolite_regenie_step1_pred.list \
   --anno-file annotations_FADS.tsv \
   --set-list setlist_FADS.tsv  \
@@ -39,4 +40,4 @@ regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
   --vc-tests skat,skato,acato \
   --rgc-gene-p \
   --bsize 20 \
-  --out metabolite_${GENE}_step2
+  --out metabolite_${GENE}_step2_minMAC
