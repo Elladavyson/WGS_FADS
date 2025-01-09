@@ -4,7 +4,7 @@ GENE=$1
 
 ### removing the dnanexus paths from the predlist file 
 
-sed 's|/home/dnanexus/out/out/||' mdd_regenie_step1_pred.list > basename_mdd_regenie_step1_pred.list
+sed 's|/home/dnanexus/out/out/||' mdd_regenie_step1_BT_nospectrometer_pred.list > basename_mdd_regenie_step1_BT_nospectrometer_pred.list
 
 ## Using the updated bim files
 # Manually in R 
@@ -21,12 +21,12 @@ regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
   --phenoFile ukb_unrel_eur_pgc3_mdd.pheno \
   --covarFile ukb_unrel_eur_covars.covar \
   --phenoCol MajDepr \
-  --covarColList Age,sex_coded,genotype_array,AC,spectrometer,PC{1:10} \
-  --catCovarList AC,spectrometer \
+  --covarColList Age,sex_coded,genotype_array,AC,PC{1:10} \
+  --catCovarList AC \
   --maxCatLevels 23 \
   --bt \
   --firth --approx \
-  --pred basename_mdd_regenie_step1_BT_pred.list \
+  --pred basename_mdd_regenie_step1_BT_nospectrometer_pred.list \
   --anno-file annotations_FADS.tsv \
   --set-list setlist_FADS.tsv  \
   --mask-def masks_FADS.txt \
@@ -36,6 +36,9 @@ regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
   --extract-setlist ${GENE} \
   --check-burden-files \
   --vc-tests skat,skato,acato \
-  --mask-lovo ${GENE},Mask4,0.01 \
+  --mask-lovo ${GENE},Mask5,0.01 \
   --bsize 100 \
-  --out mdd_${GENE}_step2_LOVO
+  --out mdd_${GENE}_step2_LOVO_mask5_0.01
+
+
+
