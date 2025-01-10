@@ -1,0 +1,311 @@
+---
+title: "FADS_regenie_results"
+author: "Ella Davyson"
+date: "2024-12-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ukbnmr)
+library(ggplot2)
+```
+
+```{r}
+setwd("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/")
+FADS <- read.table("FADS_cluster_UKB_pVCF.tsv", sep = "\t", header = T)
+metabolites <- c("f.23443.0.0", "f.23444.0.0", "f.23450.0.0", "f.23451.0.0", "f.23459.0.0")
+# Metabolite measures names 
+nmr_info$matchingmet <- paste('f.', nmr_info$UKB.Field.ID, '.0.0', sep = "")
+
+#### functions to get the metabolite name or the short version of the metabolite name ####
+
+## the full name ##
+get_metabolitename <- function(ID_vector) {
+  metabolite_names <- c()
+  for (i in ID_vector){
+    metabolite <- nmr_info$Description[nmr_info$matchingmet == i]
+    metabolite_names <- append(metabolite_names, metabolite)
+  }
+  return(metabolite_names)
+}
+## the short name ## 
+get_metaboliteshort <- function(ID_vector) {
+  metabolite_shorts <- c()
+  for(i in ID_vector) {
+    metabolite <- nmr_info$Biomarker[nmr_info$matchingmet == i]
+    metabolite_shorts <- append(metabolite_shorts, metabolite)
+  }
+  return(metabolite_shorts)
+}
+
+
+all_results <- list()
+# Read in the metabolite results per gene 
+for (gene in FADS$hgnc_symbol) {
+  print(gene)
+  results_list <- list()
+  for (i in seq_along(metabolites)) {
+    metabolite <- metabolites[i]
+    print(metabolite)
+    filepath <- paste0("regenie_step2/metabolite_minMAC/metabolite_", gene, "_step2_minMAC_", metabolite, ".regenie")
+    if (file.exists(filepath)) {
+    results <- read.table(filepath, header = T)
+    results$p <- 10^-(results$LOG10P)
+    results$GENE <- gene
+    results$ID <- gsub(paste0(gene, "."), "", results$ID)
+    results$trait <- get_metaboliteshort(metabolite)
+    results_list[[i]] <- results
+    } else {
+    warning(paste("File not found: ", filepath))
+    }
+  }
+  mdd_filepath <- paste0("regenie_step2/mdd_nospectrometer//mdd_", gene, "_step2_BT_minMAC_MajDepr.regenie")
+  if (file.exists(mdd_filepath)) {
+    mdd_results <- read.table(mdd_filepath, header = T)
+    mdd_results$p <- 10^-(mdd_results$LOG10P)
+    mdd_results$GENE <- gene
+    mdd_results$ID <- gsub(paste0(gene, "."), "", mdd_results$ID)
+    mdd_results$trait <- "MDD"
+    results_list[[length(results_list) + 1]] <- mdd_results
+  } else {
+    warning(paste("File not found: ", mdd_filepath))
+  }
+  gene_results <- do.call(rbind, results_list)
+  all_results[[gene]] <- gene_results
+  }
+
+final_results <- do.call(rbind, all_results)
+final_results <- final_results %>% 
+  mutate(p_category = case_when(
+    p < 0.01 ~ "p < 0.01",
+    p < 0.05 ~ "0.01 <= p < 0.5",
+    TRUE ~ "p >= 0.05"
+  ))
+
+final_results <- final_results %>% 
+  mutate(ID = case_when(grepl("Mask", ID) ~ ID,
+                        TRUE ~ TEST))
+#     scale_color_manual(values = c("p < 0.01" = "hotpink", 
+                   #             "0.01 <= p < 0.05" = "skyblue", 
+                            #    "p >= 0.05" = "darkgrey")
+
+final_results_tests <- final_results %>% filter(grepl("Mask", ID) | ID %in% c("GENE_P", "ADD-BURDEN-MINP", "ADD-BURDEN-SBAT"))
+final_results_tests <- final_results_tests %>% mutate(ID = factor(ID, levels = c("Mask1.0.01", "Mask1.singleton", "Mask2.0.01", "Mask2.singleton", "Mask3.0.01", "Mask3.singleton", "Mask4.0.01", "Mask4.singleton", "Mask5.0.01", "Mask5.singleton", 
+                                                                      "ADD-BURDEN-MINP", "ADD-BURDEN-SBAT", "GENE_P")))
+final_results_tests <- final_results_tests %>% mutate(test_level = ifelse(grepl("Mask", ID), "Mask", "Gene")) %>% mutate(test_level = factor(test_level, levels = c("Mask", "Gene")), TEST = case_when(TEST == "ADD" ~ "BURDEN",
+                            TEST == "ADD-ACATO" ~ "ACAT-O",
+                            TEST == "ADD-ACATV" ~ "ACAT-V",
+                            TEST == "ADD-SKAT" ~ "SKAT",
+                            TEST == "ADD-SKATO"~ "SKAT-O",
+                            TEST == "ADD-SKATO-ACAT" ~ "SKAT-O-ACAT",
+                            TEST == "ADD-BURDEN-MINP" ~ "MIN_P",
+                            TEST == "ADD-BURDEN-SBAT" ~ "SBAT",
+                            TRUE ~ TEST),
+                            ID = case_when(ID == "ADD-BURDEN-MINP" ~ "MIN_P", 
+                                           ID == "ADD-BURDEN-SBAT" ~ "SBAT",
+                                           TRUE ~ ID)) %>% 
+  mutate(TEST = factor(TEST, levels = c("BURDEN", "SKAT", "ACAT-V", "SKAT-O", "SKAT-O-ACAT", "ACAT-O", "MIN_P", "SBAT", "GENE_P")), trait = factor(trait, levels = c("MDD", "DHA", "Omega_3", "Omega_3_pct", "Omega_6_by_Omega_3", "Unsaturation")))
+
+test_cols <- c("BURDEN" = "skyblue2", "SKAT"="#FB9A99", # lt pink
+  "ACAT-V" = "palegreen2",
+  "SKAT-O" = "#CAB2D6", # lt purple
+  "SKAT-O-ACAT"= "#6A3D9A",
+  "ACAT-O" = "#FDBF6F", # lt orange
+"MIN_P"="deeppink1", 
+"SBAT"="darkturquoise", 
+"GENE_P" = "steelblue")
+
+mdd_res <- ggplot(final_results_tests %>% filter(trait == "MDD") %>% mutate(ID = factor(ID, levels = c("Mask1.0.01", "Mask1.singleton", "Mask2.0.01", "Mask2.singleton", "Mask3.0.01", "Mask3.singleton", "Mask4.0.01", "Mask4.singleton", "Mask5.0.01", "Mask5.singleton","MIN_P","GENE_P"))), 
+                  aes(x = ID, y = LOG10P, color = TEST, shape = test_level)) + geom_point() + 
+  facet_wrap( ~ GENE)  + 
+  geom_hline(yintercept = -log10(0.05), linetype="dashed", color = "red") +
+  theme_bw() +   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+                       strip.text = element_text(size = 12)) + labs(x = "", y = "-log10(P)", color = "Test", shape = "Mask/Joint Gene test")+ 
+  scale_color_manual(values=test_cols)
+
+ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/mdd_res_burden.png', plot = mdd_res, width = 8, height = 8, device='png', dpi=300)
+
+
+
+### JOINT results tests
+## Only the quantitative traits have SBAT results
+
+burden_res_all <- ggplot(final_results_tests %>% mutate(ID = factor(ID, levels = c("Mask1.0.01", "Mask1.singleton", "Mask2.0.01", "Mask2.singleton", "Mask3.0.01", "Mask3.singleton", "Mask4.0.01", "Mask4.singleton", "Mask5.0.01", "Mask5.singleton","MIN_P","SBAT", "GENE_P"))), 
+                         aes(x = ID, y = LOG10P, color = TEST, shape = test_level)) + geom_point()  + 
+  facet_grid(trait~GENE)+
+  geom_hline(yintercept = -log10(0.05), linetype="dashed", color = "red") + 
+  theme_bw() +theme(axis.text.x = element_text(angle = 90, size = 7, vjust = 0.5, hjust = 1),
+                    strip.text.x = element_text(size = 12),
+                    strip.text.y = element_text(size = 9)) +
+  labs(x = "", y = "-log10(P)", color = "Test", shape = "Mask/Joint Gene test")+ 
+  scale_color_manual(values=test_cols)
+
+
+ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/burden_res_all_09_01.png', plot = burden_res_all , width = 9, height = 11, device='png', dpi=300)
+
+
+
+```
+```{r}
+## Getting results statistics
+mdd_results <- final_results_tests %>% filter(trait == "MDD")
+# Mask level 
+## Associations with MDD
+mdd_results %>% arrange(p) %>% View()
+## Gene level associations 
+mdd_results %>% filter(test_level=="Gene") %>% arrange(p) %>% View()
+
+## P value range for all other genes (not FADS1 or FADS3 in all other masks)
+mdd_results %>% filter(!GENE %in% c("FADS1", "FADS3")) %>% 
+  pull(P) %>% range(., na.rm = T)
+mdd_results %>% filter(!GENE %in% c("FADS1", "FADS3") & test_level == "Mask") %>% 
+  pull(p) %>% range(., na.rm = T)
+mdd_results %>% filter(!GENE %in% c("FADS1", "FADS3") & test_level == "Gene") %>% 
+  pull(p) %>% range(., na.rm = T)
+
+## Plot the effect sizes of the burden tests for the genes
+
+all_beta_effects <- ggplot(final_results_tests %>% filter(TEST == "BURDEN"), aes(x = ID, y = BETA)) + geom_point() + facet_grid(trait~GENE) +   theme_bw() +theme(axis.text.x = element_text(angle = 90, size = 9, vjust = 0.5, hjust = 1),
+                    strip.text.x = element_text(size = 12),
+                    strip.text.y = element_text(size = 9)) +   geom_hline(yintercept = 0, linetype="dashed", color = "lightgreen") + labs(y = "Pseudo-genotype Beta", x = "Mask")
+
+mdd_beta_effects <- ggplot(mdd_results %>% filter(TEST == "BURDEN"), aes(x = ID, y = BETA)) + geom_point() + facet_wrap(~GENE) +   theme_bw() +theme(axis.text.x = element_text(angle = 90, size = 9, vjust = 0.5, hjust = 1),
+                    strip.text.x = element_text(size = 12),
+                    strip.text.y = element_text(size = 9)) +   geom_hline(yintercept = 0, linetype="dashed", color = "lightgreen") + labs(y = "Pseudo-genotype Beta", x = "Mask")
+
+
+ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/burden_mdd_effects.png', plot = mdd_beta_effects , width = 7, height = 7, device='png', dpi=300)
+ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/burden_all_effects.png', plot = all_beta_effects , width = 7, height = 7, device='png', dpi=300)
+
+# METABOLITE results masks 
+metabolite_results_masks <- final_results_tests %>% filter(trait != "MDD" & grepl("Mask", ID))
+# Get the P value range for certain masks for each gene 
+# Mostly Mask 4 and 5 for FADS2 it is Mask 3
+metabolite_results_masks %>%
+  filter(ID == "Mask4.0.01" | ID == "Mask5.0.01") %>%
+  group_by(GENE, trait) %>%
+  summarize(
+    p_min = format(min(p), scientific = TRUE),  # Minimum p-value in scientific notation
+    p_max = max(p),  # Maximum p-value
+    p_min_test = TEST[which.min(p)],            # Test corresponding to the min p-value
+    p_max_test = TEST[which.max(p)],            # Test corresponding to the max p-value
+    p_max_below_0.05 = format(ifelse(any(p < 0.05), max(p[p < 0.05]), NA), scientific = TRUE) # Max p-value below 0.05
+  ) %>%
+  filter(GENE == "TMEM258")
+
+### For FADS1 Mask5.0.01 Find the most powerful test
+metabolite_results_masks %>%
+  filter(ID == "Mask5.0.01") %>%
+  group_by(GENE, trait) %>%
+  summarize(
+    p_min = format(min(p), scientific = TRUE),  # Minimum p-value in scientific notation
+    p_max = max(p),  # Maximum p-value
+    p_min_test = TEST[which.min(p)],            # Test corresponding to the min p-value
+    p_max_test = TEST[which.max(p)],            # Test corresponding to the max p-value
+    p_max_below_0.05 = format(ifelse(any(p < 0.05), max(p[p < 0.05]), NA), scientific = TRUE) # Max p-value below 0.05
+  ) %>%
+  filter(GENE == "FADS1")
+
+# Metabolites 
+FADS1_Mask5_SKAT <- metabolite_results_masks %>% 
+  filter(ID == "Mask5.0.01" & GENE == "FADS1" & TEST == "SKAT") %>% 
+  select(trait, p, LOG10P, TEST) %>% 
+  rename(p_all = p,
+         LOG10P_all = LOG10P,
+         all_test = TEST)
+
+# MDD (ACAT-V)
+FADS1_Mask5_ACATV <- mdd_results %>%
+  filter(ID == "Mask5.0.01" & GENE == "FADS1" & TEST == "ACAT-V") %>% 
+    select(trait, p, LOG10P, TEST) %>% 
+  rename(p_all = p,
+         LOG10P_all = LOG10P,
+         all_test = TEST)
+FADS1_Mask5_res <- rbind(FADS1_Mask5_ACATV, FADS1_Mask5_SKAT)
+```
+
+MDD Burden test results and metabolite burden results in metabolites have a signal for MDD and the metabolites
+MDD test (ACAT-V)
+Metabolites (SKAT-O)
+LOVO test results for Mask 5: 
+
+```{r}
+final_results_tests %>% filter(trait == "MDD" & p < 0.05) 
+
+lovo_res_mdd <- read.table("regenie_step2/mdd_nospectrometer/lovo/mdd_FADS1_step2_LOVO_mask5_0.01_MajDepr.regenie", header= T)
+lovo_res_mdd$variant <- gsub("FADS1.Mask5.0.01_", "", lovo_res_mdd$ID)
+lovo_res_mdd <- lovo_res_mdd %>% separate(variant, into = c("CHR", "POS", "REF", "ALT"), remove = FALSE) %>% 
+  mutate(lowCI = BETA - 1.96*(SE),
+         highCI = BETA + 1.96*(SE)) %>% 
+  mutate(POS = as.numeric(GENPOS)) %>% mutate(trait = "MDD")
+
+# Reading in metabolite LOVO results 
+lovo_res_metabolites <- list()
+for (i in seq_along(metabolites)) {
+    metabolite <- metabolites[i]
+    print(metabolite)
+    filepath <- paste0("regenie_step2/metabolite/lovo/metabolite_FADS1_step2_LOVO_mask5_0.01_", metabolite, ".regenie")
+    if (file.exists(filepath)) {
+    results <- read.table(filepath, header = T)
+    results$ID <- gsub(paste0(gene, "."), "", results$ID)
+    results$trait <- get_metaboliteshort(metabolite)
+    results$variant <- gsub("FADS1.Mask5.0.01_", "", results$ID)
+    results <- results %>% separate(variant, into = c("CHR", "POS", "REF", "ALT"), remove = FALSE) %>% 
+  mutate(lowCI = BETA - 1.96*(SE),
+         highCI = BETA + 1.96*(SE)) %>% 
+  mutate(POS = as.numeric(GENPOS)) 
+    lovo_res_metabolites[[i]] <- results
+    } else {
+    warning(paste("File not found: ", filepath))
+    }
+  }
+lovo_res_metabolite <- do.call(rbind, lovo_res_metabolites)
+lovo_res_metabolite_skato <- lovo_res_metabolite %>% filter(TEST == "ADD-SKAT")
+lovo_res_all <- rbind(lovo_res_mdd %>% filter(TEST == "ADD-ACATV"), lovo_res_metabolite_skato)
+# select(c(CHROM, GENPOS, ID, ALLELE0, ALLELE1, A1FREQ, N, TEST, BETA, SE, CHISQ, LOG10P, EXTRA, variant, CHR, POS, REF, ALT, lowCI, highCI)
+# Read in the variant annotation results so I have can add this info to the plot: 
+FADS1_priority <- read.table(paste0("vep_res/AC_overzero_06_01/FADS1_vepoutput_proc/FADS1_priority_annot.tsv"), sep = "\t", header = T)
+FADS1_priority <- FADS1_priority %>% 
+  mutate(variant = gsub("chr", "", chr_pos_ref_alt)) %>%
+  mutate(variant = gsub("_", ":", variant))
+lovo_res_all <- left_join(lovo_res_all, FADS1_priority %>% select(variant, AF, AC), by = "variant")
+annotation <- read.table("REGENIE input/annotations_FADS.tsv", sep = "\t")
+colnames(annotation) <- c("variant", "GENE", "annotation")
+FADS1_annotation <- annotation %>% filter(GENE == "FADS1")
+lovo_res_all <- left_join(lovo_res_all, FADS1_annotation %>% select(variant, annotation), by = "variant")
+lovo_res_all$annotation <- factor(lovo_res_all$annotation, levels = c("LoF", "H_IMPACT", "REVEL", "CADD", "MOD_IMPACT"))
+lovo_res_all <- left_join(lovo_res_all, FADS1_Mask5_res, by = "trait")
+
+## Change to label those with a beta outside the SE ? 
+# Add ranking columns grouped by trait
+lovo_res_all <- lovo_res_all %>%
+  group_by(trait) %>%
+  mutate(
+    rank_low = rank(LOG10P, ties.method = "first"),
+    rank_high = rank(-LOG10P, ties.method = "first"),
+    label = ifelse(rank_low <= 1 | rank_high <= 1, variant, NA)  # Label top 5 and bottom 5 per trait
+  ) %>%
+  ungroup() %>% 
+  mutate(trait_label = paste0(trait, ": ", all_test)) %>% 
+  mutate(trait_label = factor(trait_label, levels = c("MDD: ACAT-V", "DHA: SKAT", "Omega_3_pct: SKAT",
+                                                      "Omega_3: SKAT", "Omega_6_by_Omega_3: SKAT", "Unsaturation: SKAT")))
+
+lovo_res_plt <- ggplot(lovo_res_all %>% filter(variant != "FADS1.Mask5.0.01"), aes(y=LOG10P, x = POS, color = annotation)) + geom_point(aes(size = as.factor(AC))) + 
+    geom_hline(data = lovo_res_all, aes(yintercept = LOG10P_all), color = "black", linetype = "dashed") + 
+  geom_hline(yintercept = -log10(0.05), linetype = "dotted", color = "darkred") +
+  theme_bw() +
+  theme(strip.text = element_text(size = 12)) + 
+    # Adding labels to points below the thresholdgeom_text_repel(
+    geom_text_repel(data = lovo_res_all %>% filter(LOG10P < -log10(0.05)), aes(label = variant),
+    size = 4,
+    vjust = 1.5,              # Position below the point               # Text size
+    show.legend = FALSE , 
+    na.rm = TRUE  # Only show points with labels   # Hide labels in legend
+) + facet_wrap(~ trait_label) + labs(color = "Most deleterious annotation", size = "Allele Count", x = "Gene Position", y = "-log10(P)")
+
+ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/LOVO_results.png', plot = lovo_res_plt, width = 10, height = 8, device='png', dpi=300)
+
+```
+
