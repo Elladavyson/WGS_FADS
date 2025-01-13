@@ -9,7 +9,7 @@ library(ggplot2)
 library(Hmisc) # Have to install
 library(ggpubr) # Have to install 
 library(ggsignif) # Have to install 
-library(UpSetR) # Have to install 
+library(#R) # Have to install 
 library(caret) # Have to install
 
 # dx download /Output/genotypes/genotype_summary/all_priority/*_carrier_info.tsv
@@ -338,7 +338,7 @@ ggsave(filename="carrier_numbers_permask_mdd.png", carrier_numbers_permask_mdd, 
 ggsave(filename="carrier_numbers_permask_metabolite.png", carrier_numbers_permask_metabol, width = 12, height = 8, device = "png", dpi = 300)
 
 # Carriers of pathogenic in various different genes (?)
-# UpSet Plot of MDD cohort cross-carriers 
+# # Plot of MDD cohort cross-carriers 
 carriers_across_genes_mdd <- list()
 carriers_across_genes_metabol <- list()
 
@@ -367,20 +367,20 @@ carriers_across_genes_metabol <- genes %>%
         filter(grepl(.x, gene_carriers)) %>%
         pull(SAMPLE))
 
-upset_plt_metabol <- upset(fromList(carriers_across_genes_metabol), nsets = length(carriers_across_genes_metabol), 
+#_plt_metabol <- #(fromList(carriers_across_genes_metabol), nsets = length(carriers_across_genes_metabol), 
 set_size.show = TRUE, order.by = 'freq') + grid.text("Metabolite-cohort", x = 0.5, y = 0.97, gp = gpar(fontsize = ))
 
-# Plot the Upset Plot
-png(paste0("UpSet_privar_carriers_genes_mdd.png"), 
+# Plot the # Plot
+png(paste0("#_privar_carriers_genes_mdd.png"), 
     width = 3200, height = 2000, res = 300, type = "cairo")
-upset(fromList(carriers_across_genes_mdd), nsets = length(carriers_across_genes_mdd),
+#(fromList(carriers_across_genes_mdd), nsets = length(carriers_across_genes_mdd),
 set_size.show = TRUE, order.by = 'freq')
 grid.text("MDD-cohort: Carriers of prioritised variants in FADS genes", x = 0.6, y = 0.97, gp = gpar(fontsize = 14))
 dev.off()
 
-png(paste0("UpSet_privar_carriers_genes_metabol.png"), 
+png(paste0("#_privar_carriers_genes_metabol.png"), 
     width = 3200, height = 2000, res = 300, type = "cairo")
-upset(fromList(carriers_across_genes_metabol), nsets = length(carriers_across_genes_metabol),
+#(fromList(carriers_across_genes_metabol), nsets = length(carriers_across_genes_metabol),
 set_size.show = TRUE, order.by = 'freq')
 grid.text("Metabolite-cohort: Carriers of prioritised variants in FADS genes", x = 0.6, y = 0.97, gp = gpar(fontsize = 14))
 dev.off()
@@ -1125,3 +1125,238 @@ ggsave(filename ="carriers_variants_pergene_option2.png",
 
  ggarrange(pri_var_counts_plt,part_carriers_gene_nomask_plt, nrow = 2, ncol = 1), 
  width = 8, height = 10, device = "png", dpi = 300)
+
+###################################################################################
+
+# Carriers of the LOVO variants 
+
+###################################################################################
+
+fads1_mdd_lovo_carriers <- FADS1_part_genotype %>% filter(grepl("chr11_61816814_G_C", het_variants))
+fads1_mdd_lovo_all <- all_gene_carriers_mdd %>% mutate(lovo_carrier = ifelse(f.eid %in% fads1_mdd_lovo_carriers$SAMPLE, "Yes", "No"))
+
+summary_carriers_lovo <- function(carrier_dataframe) {
+  carrier_dataframe <- carrier_dataframe %>% filter(GENE == "FADS1")
+    carrier_summary <- carrier_dataframe %>% 
+    group_by(lovo_carrier) %>%
+summarise(mean_age = mean(Age, na.rm = T),
+sd_age = sd(Age, na.rm = TRUE),
+mean_bmi = mean(BMI, na.rm = T),
+sd_bmi = sd(BMI, na.rm = TRUE),
+mean_TDI = mean(TDI, na.rm = TRUE),
+sd_TDI = sd(TDI, na.rm = T),
+num_females = sum(sex_coded==0),
+num_males = sum(sex_coded == 1),
+num_current_smokers = sum(smoking_stat == "Current"),
+num_never_smokers = sum(smoking_stat == "Never"),
+num_previous_smokers = sum(smoking_stat == "Previous"),
+num_uni = sum(uni_nouni == 1),
+num_nouni = sum(uni_nouni==0),
+num_white_ethnicity = sum(ethnicity_collapsed == 0, na.rm = TRUE),
+num_mixed_ethnicity = sum(ethnicity_collapsed == 1, na.rm = TRUE),
+num_other_ethnicity = sum(ethnicity_collapsed == 2, na.rm = TRUE),
+num_mdd_cases = sum(MajDepr == 1),
+num_mdd_controls = sum(MajDepr == 0),
+total = n()) %>% 
+mutate(Age_stat = paste0(signif(mean_age,3), " (", signif(sd_age, 3), ")"),
+BMI_stat = paste0(signif(mean_bmi,3), " (", signif(sd_bmi, 3), ")"),
+TDI_stat = paste0(signif(mean_TDI, 3), " (", signif(sd_TDI, 3), ")"),
+females_stat = paste0(num_females, " (", signif((num_females/total)*100,3), "%)"),
+current_stat = paste0(num_current_smokers, " (", signif((num_current_smokers/total)*100,3), "%)"),
+previous_stat = paste0(num_previous_smokers, " (", signif((num_previous_smokers/total)*100,3), "%)"),
+never_stat = paste0(num_never_smokers, " (", signif((num_never_smokers/total)*100,3), "%)"),
+uni_stat = paste0(num_uni, " (", signif((num_uni/total)*100,3), "%)"),
+nouni_stat = paste0(num_nouni, " (", signif((num_nouni/total)*100,3), "%)"),
+white_eth_stat = paste0(num_white_ethnicity, " (", signif((num_white_ethnicity/total)*100,3), "%)"),
+mixed_eth_stat = paste0(num_mixed_ethnicity, " (", signif((num_mixed_ethnicity/total)*100,3), "%)"),
+other_eth_stat = paste0(num_other_ethnicity, " (", signif((num_other_ethnicity/total)*100,3), "%)"),
+mdd_cases_stat = paste0(num_mdd_cases, " (", signif((num_mdd_cases/total)*100,3), "%)"),
+mdd_controls_stat = paste0(num_mdd_controls, " (", signif((num_mdd_controls/total)*100,3), "%)")
+) %>% 
+select(lovo_carrier, total, ends_with("stat")) %>% 
+as.data.frame()
+return(carrier_summary)
+}
+fads1_mdd_lovo_summary <- summary_carriers_lovo(fads1_mdd_lovo_all %>% filter(status != "NA"))
+write.table(fads1_mdd_lovo_summary, "FADS1_chr11_61816814_G_C_demo.tsv", sep = "\t", quote = F,row.names = F)
+####################################################################
+
+# Graphs of norm metabolite carriers witrh LOVO variant highlighted 
+
+####################################################################
+
+norm_metabolite_carriers <- norm_metabolite_carriers %>% mutate(lovo_mdd_carrier= ifelse(f.eid %in% fads1_mdd_lovo_carriers$SAMPLE, "Carrier", "Non-carrier"))
+
+violin_meta_dists_mdd_lovo <- function(gene, metabolite, mask) {
+    # Filter out NA values for the gene status column
+    norm_metabolite <- norm_metabolite_carriers %>% 
+        filter(GENE == gene) %>%
+        mutate(across(
+    all_of(mask_columns), 
+    ~ factor(., levels = c("carrier", "non-carrier"))
+  ))
+    # Get the relevant ttest result
+    metabolitename <- get_metabolitename(metabolite)
+    genename <- gene
+    maskname <- mask
+    plt <- ggplot(norm_metabolite, aes(x = as.factor(MajDepr), 
+                                       y = !!sym(metabolite), 
+                                       fill = as.factor(MajDepr))) + 
+        geom_violin(trim = FALSE, na.rm = TRUE, alpha = 0.3) +
+        geom_jitter(aes(color = lovo_mdd_carrier), shape = 16, position = position_jitter(0.2), na.rm = TRUE) +
+        scale_color_brewer(palette = "Set2", aesthetics = c("fill"), 
+                           labels = c("Controls", "Cases"), 
+                           name = "MDD status") +
+        scale_color_manual(values = c("Carrier" = "#FF007F", "Non-carrier"="gray"),
+        name = "c.116C>G")+ 
+        theme_classic() +
+        facet_wrap(~Mask5.0.01_status) +
+        stat_summary(fun.data = data_summary, shape = 23, color = "black", na.rm = TRUE) + 
+        labs(title ="", 
+             x = "MDD status", 
+             y =   'Normalised measure') + 
+        scale_x_discrete(labels = c("Controls", "Cases")) +
+        theme(
+              text = element_text(size = 9))
+
+    return(plt)
+}
+
+
+mdd_mask5_plots_FADS1_lovo <- list()
+for(i in 1:length(metabolites)) {
+  metabolite <- metabolites[i]
+  mdd_mask5_plots_FADS1_lovo[[i]] <- violin_meta_dists_mdd_lovo("FADS1", metabolite, "Mask5.0.01_status")
+  
+}
+FADS1_mask5_mddshort_lovo <- ggarrange(plotlist = mdd_mask5_plots_FADS1_lovo, 
+                             nrow = 3, 
+                             ncol = 2, 
+                             labels = sapply(metabolites, get_metaboliteshort),
+                             common.legend = TRUE)
+
+ggsave(filename =  "FADS1_meta_hists_carriers_mask50.01_mdd_lovo.png", 
+         plot = annotate_figure(FADS1_mask5_mddshort_lovo, top = text_grob("FADS1\nPrioritised variant carriers (Mask 5), MDD status and c.116C>G variant carriers", size = 14, face = "bold")),
+         width = 8, height = 10, device = "png", dpi = 300)
+
+################################################################
+
+# Metabolite LOVO results 
+
+################################################################
+
+fads1_metabolite_lovo_carriers <- FADS1_part_genotype %>% filter(grepl("chr11_61810815_C_A", het_variants))
+fads1_metabolite_lovo_all <- all_gene_carriers_metabol %>% mutate(lovo_carrier = ifelse(f.eid %in% fads1_metabolite_lovo_carriers$SAMPLE, "Yes", "No"))
+
+summary_metacarrier_status_lovo <- function(carrier_dataframe) {
+  carrier_dataframe <- carrier_dataframe %>% filter(GENE == "FADS1")
+    carrier_summary <- carrier_dataframe %>% 
+    group_by(lovo_carrier) %>% 
+summarise(mean_age = mean(Age, na.rm = T),
+sd_age = sd(Age, na.rm = TRUE),
+mean_f.23443 = mean(f.23443.0.0, na.rm = TRUE),
+sd_f.23443= sd(f.23443.0.0, na.rm = TRUE),
+mean_f.23444 = mean(f.23444.0.0, na.rm = TRUE),
+sd_f.23444= sd(f.23444.0.0, na.rm = TRUE),
+mean_f.23450 = mean(f.23450.0.0, na.rm = TRUE),
+sd_f.23450= sd(f.23450.0.0, na.rm = TRUE),
+mean_f.23451 = mean(f.23451.0.0, na.rm = TRUE),
+sd_f.23451= sd(f.23451.0.0, na.rm = TRUE),
+mean_f.23459 = mean(f.23459.0.0, na.rm = TRUE),
+sd_f.23459= sd(f.23459.0.0, na.rm = TRUE),
+mean_bmi = mean(BMI, na.rm = T),
+sd_bmi = sd(BMI, na.rm = TRUE),
+mean_TDI = mean(TDI, na.rm = TRUE),
+sd_TDI = sd(TDI, na.rm = T),
+num_females = sum(sex_coded==0),
+num_males = sum(sex_coded == 1),
+num_current_smokers = sum(smoking_stat == "Current"),
+num_never_smokers = sum(smoking_stat == "Never"),
+num_previous_smokers = sum(smoking_stat == "Previous"),
+num_uni = sum(uni_nouni == 1),
+num_nouni = sum(uni_nouni==0),
+num_white_ethnicity = sum(ethnicity_collapsed == 0, na.rm = TRUE),
+num_mixed_ethnicity = sum(ethnicity_collapsed == 1, na.rm = TRUE),
+num_other_ethnicity = sum(ethnicity_collapsed == 2, na.rm = TRUE),
+num_mdd_cases = sum(MajDepr == 2),
+num_mdd_controls = sum(MajDepr == 1),
+total = n()) %>% 
+mutate(Age_stat = paste0(signif(mean_age,3), " (", signif(sd_age, 3), ")"),
+BMI_stat = paste0(signif(mean_bmi,3), " (", signif(sd_bmi, 3), ")"),
+f.23443.0.0_stat = paste0(signif(mean_f.23443,3), " (", signif(sd_f.23443, 3), ")"),
+f.23444.0.0_stat = paste0(signif(mean_f.23444,3), " (", signif(sd_f.23444, 3), ")"),
+f.23450.0.0_stat = paste0(signif(mean_f.23450,3), " (", signif(sd_f.23450, 3), ")"),
+f.23451.0.0_stat = paste0(signif(mean_f.23451,3), " (", signif(sd_f.23451, 3), ")"),
+f.23459.0.0_stat = paste0(signif(mean_f.23459,3), " (", signif(sd_f.23459, 3), ")"),
+TDI_stat = paste0(signif(mean_TDI, 3), " (", signif(sd_TDI, 3), ")"),
+females_stat = paste0(num_females, " (", signif((num_females/total)*100,3), "%)"),
+current_stat = paste0(num_current_smokers, " (", signif((num_current_smokers/total)*100,3), "%)"),
+previous_stat = paste0(num_previous_smokers, " (", signif((num_previous_smokers/total)*100,3), "%)"),
+never_stat = paste0(num_never_smokers, " (", signif((num_never_smokers/total)*100,3), "%)"),
+uni_stat = paste0(num_uni, " (", signif((num_uni/total)*100,3), "%)"),
+nouni_stat = paste0(num_nouni, " (", signif((num_nouni/total)*100,3), "%)"),
+white_eth_stat = paste0(num_white_ethnicity, " (", signif((num_white_ethnicity/total)*100,3), "%)"),
+mixed_eth_stat = paste0(num_mixed_ethnicity, " (", signif((num_mixed_ethnicity/total)*100,3), "%)"),
+other_eth_stat = paste0(num_other_ethnicity, " (", signif((num_other_ethnicity/total)*100,3), "%)"),
+mdd_cases_stat = paste0(num_mdd_cases, " (", signif((num_mdd_cases/total)*100,3), "%)"),
+mdd_controls_stat = paste0(num_mdd_controls, " (", signif((num_mdd_controls/total)*100,3), "%)")
+) %>% 
+select(lovo_carrier, total, ends_with("stat")) %>% 
+as.data.frame()
+return(carrier_summary)
+}
+
+fads1_metabolite_lovo_summary <- summary_metacarrier_status_lovo(fads1_metabolite_lovo_all %>% filter(!is.na(status)))
+write.table(fads1_metabolite_lovo_summary, "FADS1_chr11_61810815_C_A_meta_demo.tsv", sep = "\t", quote = F,row.names = F)
+
+####### Plotting the metabolite distributions 
+
+norm_metabolite_carriers <- norm_metabolite_carriers %>% mutate(lovo_metabolite_carrier= ifelse(f.eid %in% fads1_metabolite_lovo_carriers$SAMPLE, "Carrier", "Non-carrier"))
+
+
+violin_meta_dists_lovo <- function(gene, metabolite) {
+    # Filter out NA values for the gene status column
+    norm_metabolite <- norm_metabolite_carriers %>% 
+        filter(GENE == "FADS1") %>%
+        mutate(across(
+    all_of(mask_columns), 
+    ~ factor(., levels = c("carrier", "non-carrier"))
+  ))
+    # Get the relevant ttest result
+    metabolitename <- get_metabolitename(metabolite)
+    genename <- gene
+    plt <- ggplot(norm_metabolite, aes(x = as.factor(lovo_mdd_carrier), 
+                                       y = !!sym(metabolite),
+                                       color = as.factor(lovo_mdd_carrier), 
+                                       fill = as.factor(lovo_mdd_carrier))) + 
+        geom_violin(trim = FALSE, na.rm = TRUE, alpha = 0.3) +
+        scale_color_brewer(palette = "Set1", aesthetics = c("colour", "fill"), 
+                           labels = c("Carrier", "Non-carrier"), 
+                           name = "chr11:61810815:C:A") + 
+        theme_classic() +
+        geom_jitter(shape = 16, position = position_jitter(0.2), na.rm = TRUE) +
+        stat_summary(fun.data = data_summary, shape = 23, color = "black", na.rm = TRUE) + 
+        labs(title ="", 
+             x = "chr11:61810815:C:A", 
+             y =  'Normalised measure') + 
+        scale_x_discrete(labels = c("Carrier", "Non-carrier")) +
+        theme(legend.position = "none", 
+              text = element_text(size = 9))
+    return(plt)
+}
+
+metabolite_mask5_plots_FADS1_lovo <- list()
+for(i in 1:length(metabolites)) {
+  metabolite <- metabolites[i]
+  metabolite_mask5_plots_FADS1_lovo[[i]] <- violin_meta_dists_lovo("FADS1", metabolite)
+  
+}
+FADS1_mask5_metaboliteshort_lovo <- ggarrange(plotlist = metabolite_mask5_plots_FADS1_lovo, 
+                             nrow = 3, 
+                             ncol = 2, 
+                             labels = sapply(metabolites, get_metaboliteshort),
+                             common.legend = TRUE)
+
+ggsave(filename =  "FADS1_meta_hists_chr11_61810815_C_A_carriers.png", 
+plot = annotate_figure(FADS1_mask5_metaboliteshort_lovo, top = text_grob("FADS1\nMetabolite histograms for carriers and non-carriers of chr11:61810815:C:A variant", size = 14, face = "bold")),
+width = 8, height = 10, device = "png", dpi = 300)
