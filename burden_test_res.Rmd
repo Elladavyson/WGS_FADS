@@ -4,13 +4,16 @@ author: "Ella Davyson"
 date: "2024-12-10"
 output: html_document
 ---
-
+# Set up
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ukbnmr)
 library(ggplot2)
+library(openxlsx) # writing supp tables
 ```
+
+# AVT results 
 
 ```{r}
 setwd("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/")
@@ -145,9 +148,13 @@ burden_res_all <- ggplot(final_results_tests %>% mutate(ID = factor(ID, levels =
 
 ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/burden_res_all_09_01.png', plot = burden_res_all , width = 9, height = 11, device='png', dpi=300)
 
+write.table(final_results_tests, "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/regenie_step2/burden_all_results.tsv", sep = "\t", row.names = F, quote = F)
 
 
 ```
+
+
+
 ```{r}
 ## Getting results statistics
 mdd_results <- final_results_tests %>% filter(trait == "MDD")
@@ -159,7 +166,7 @@ mdd_results %>% filter(test_level=="Gene") %>% arrange(p) %>% View()
 
 ## P value range for all other genes (not FADS1 or FADS3 in all other masks)
 mdd_results %>% filter(!GENE %in% c("FADS1", "FADS3")) %>% 
-  pull(P) %>% range(., na.rm = T)
+  pull(p) %>% range(., na.rm = T)
 mdd_results %>% filter(!GENE %in% c("FADS1", "FADS3") & test_level == "Mask") %>% 
   pull(p) %>% range(., na.rm = T)
 mdd_results %>% filter(!GENE %in% c("FADS1", "FADS3") & test_level == "Gene") %>% 
@@ -184,7 +191,7 @@ metabolite_results_masks <- final_results_tests %>% filter(trait != "MDD" & grep
 # Get the P value range for certain masks for each gene 
 # Mostly Mask 4 and 5 for FADS2 it is Mask 3
 metabolite_results_masks %>%
-  filter(ID == "Mask4.0.01" | ID == "Mask5.0.01") %>%
+  filter(ID == "Mask3.0.01" | ID == "Mask3.singleton") %>%
   group_by(GENE, trait) %>%
   summarize(
     p_min = format(min(p), scientific = TRUE),  # Minimum p-value in scientific notation
@@ -193,7 +200,7 @@ metabolite_results_masks %>%
     p_max_test = TEST[which.max(p)],            # Test corresponding to the max p-value
     p_max_below_0.05 = format(ifelse(any(p < 0.05), max(p[p < 0.05]), NA), scientific = TRUE) # Max p-value below 0.05
   ) %>%
-  filter(GENE == "TMEM258")
+  filter(GENE == "FADS2")
 
 ### For FADS1 Mask5.0.01 Find the most powerful test
 metabolite_results_masks %>%
@@ -226,6 +233,8 @@ FADS1_Mask5_ACATV <- mdd_results %>%
 FADS1_Mask5_res <- rbind(FADS1_Mask5_ACATV, FADS1_Mask5_SKAT)
 ```
 
+# LOVO results 
+
 MDD Burden test results and metabolite burden results in metabolites have a signal for MDD and the metabolites
 MDD test (ACAT-V)
 Metabolites (SKAT-O)
@@ -234,7 +243,7 @@ LOVO test results for Mask 5:
 ```{r}
 final_results_tests %>% filter(trait == "MDD" & p < 0.05) 
 
-lovo_res_mdd <- read.table("regenie_step2/mdd_nospectrometer/lovo/mdd_FADS1_step2_LOVO_mask5_0.01_MajDepr.regenie", header= T)
+  lovo_res_mdd <- read.table("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/regenie_step2/mdd_nospectrometer/lovo/mdd_FADS1_step2_LOVO_mask5_0.01_MajDepr.regenie", header= T)
 lovo_res_mdd$variant <- gsub("FADS1.Mask5.0.01_", "", lovo_res_mdd$ID)
 lovo_res_mdd <- lovo_res_mdd %>% separate(variant, into = c("CHR", "POS", "REF", "ALT"), remove = FALSE) %>% 
   mutate(lowCI = BETA - 1.96*(SE),
@@ -246,7 +255,7 @@ lovo_res_metabolites <- list()
 for (i in seq_along(metabolites)) {
     metabolite <- metabolites[i]
     print(metabolite)
-    filepath <- paste0("regenie_step2/metabolite/lovo/metabolite_FADS1_step2_LOVO_mask5_0.01_", metabolite, ".regenie")
+    filepath <- paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/regenie_step2/metabolite/lovo/metabolite_FADS1_step2_LOVO_mask5_0.01_", metabolite, ".regenie")
     if (file.exists(filepath)) {
     results <- read.table(filepath, header = T)
     results$ID <- gsub(paste0(gene, "."), "", results$ID)
@@ -266,12 +275,12 @@ lovo_res_metabolite_skato <- lovo_res_metabolite %>% filter(TEST == "ADD-SKAT")
 lovo_res_all <- rbind(lovo_res_mdd %>% filter(TEST == "ADD-ACATV"), lovo_res_metabolite_skato)
 # select(c(CHROM, GENPOS, ID, ALLELE0, ALLELE1, A1FREQ, N, TEST, BETA, SE, CHISQ, LOG10P, EXTRA, variant, CHR, POS, REF, ALT, lowCI, highCI)
 # Read in the variant annotation results so I have can add this info to the plot: 
-FADS1_priority <- read.table(paste0("vep_res/AC_overzero_06_01/FADS1_vepoutput_proc/FADS1_priority_annot.tsv"), sep = "\t", header = T)
+FADS1_priority <- read.table(paste0("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/vep_res/AC_overzero_06_01/FADS1_vepoutput_proc/FADS1_priority_annot.tsv"), sep = "\t", header = T)
 FADS1_priority <- FADS1_priority %>% 
   mutate(variant = gsub("chr", "", chr_pos_ref_alt)) %>%
   mutate(variant = gsub("_", ":", variant))
 lovo_res_all <- left_join(lovo_res_all, FADS1_priority %>% select(variant, AF, AC), by = "variant")
-annotation <- read.table("REGENIE input/annotations_FADS.tsv", sep = "\t")
+annotation <- read.table("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/REGENIE input/annotations_FADS.tsv", sep = "\t")
 colnames(annotation) <- c("variant", "GENE", "annotation")
 FADS1_annotation <- annotation %>% filter(GENE == "FADS1")
 lovo_res_all <- left_join(lovo_res_all, FADS1_annotation %>% select(variant, annotation), by = "variant")
@@ -307,5 +316,52 @@ lovo_res_plt <- ggplot(lovo_res_all %>% filter(variant != "FADS1.Mask5.0.01"), a
 
 ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/LOVO_results.png', plot = lovo_res_plt, width = 10, height = 8, device='png', dpi=300)
 
+## LOVO res results 
+
+lovo_res_all %>% filter(trait == "MDD") %>% arrange(LOG10P, decreasing = TRUE) %>% as.data.frame()
+FADS1_priority %>% filter(variant == "11:61816814:G:C")
+```
+
+# Thesis supplementary tables
+
+```{r}
+################################################################
+
+## Thesis supplementary Data tables 
+
+################################################################
+
+# load the excel file for adding sheets of other tables 
+supp_wb <- loadWorkbook('/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/WGS_supp_data.xlsx')
+
+sheet_names <- getSheetNames('/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/WGS_supp_data.xlsx')
+
+# if statements to account for overwriting (if I want to add more columns etc I don't want it to be a new sheet, just to overwrite the old one)
+
+###########################################################
+
+# Burden results 
+if (!("Burden_results" %in% sheet_names)) {
+  addWorksheet(supp_wb, "Burden_results")
+}
+writeData(supp_wb,"Burden_results", final_results_tests %>% 
+            filter(grepl("Mask", ID)) %>% select(
+             GENE, trait, ID, N, TEST, BETA, SE, CHISQ, LOG10P, EXTRA) %>% 
+            arrange(GENE, trait, TEST))
+
+# LOVO results 
+if (!("LOVO_results" %in% sheet_names)) {
+  addWorksheet(supp_wb, "LOVO_results")
+}
+writeData(supp_wb,"LOVO_results", lovo_res_all %>% 
+            mutate(trait = factor(trait, levels = c(
+              "MDD", "DHA", "Omega_3", "Omega_3_pct", "Omega_6_by_Omega_3"))) %>% 
+                select(trait, ID,variant, N, TEST, CHISQ, LOG10P) %>% 
+            arrange(trait, LOG10P))
+
+# LOVO results 
+
+# save the sheets 
+saveWorkbook(supp_wb, '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/WGS_supp_data.xlsx', overwrite=T)
 ```
 
