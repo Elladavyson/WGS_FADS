@@ -57,9 +57,9 @@ table(FADS1_priority_var$chr_pos_ref_alt %in% FADS2_priority_var$chr_pos_ref_alt
 
 ```{r}
 ####### Consequence plots 
-pri_csq_mdd_all <- rbind(FADS1_priority_csq_mdd, FADS2_priority_csq_mdd, FADS3_priority_csq_mdd, FEN1_priority_csq_mdd, MYRF_priority_csq_mdd, TMEM258_priority_csq_mdd) %>% mutate(cohort = paste0(cohort, "-cohort"), IMPACT = factor(IMPACT, levels = c("HIGH", "MODERATE", "MODIFIER", "LOW")))
+pri_csq_mdd_all <- rbind(FADS1_priority_csq_mdd, FADS2_priority_csq_mdd, FADS3_priority_csq_mdd, FEN1_priority_csq_mdd, MYRF_priority_csq_mdd, TMEM258_priority_csq_mdd) %>% mutate(cohort = paste0(cohort, "-cohort"), IMPACT = factor(IMPACT, levels = c("HIGH", "MODERATE", "LOW",  "MODIFIER")))
 
-pri_csq_metabol_all <- rbind(FADS1_priority_csq_metabol, FADS2_priority_csq_metabol, FADS3_priority_csq_metabol, FEN1_priority_csq_metabol, MYRF_priority_csq_metabol, TMEM258_priority_csq_metabol) %>% mutate(cohort = paste0(cohort, "-cohort"), IMPACT = factor(IMPACT, levels = c("HIGH", "MODERATE", "MODIFIER", "LOW")))
+pri_csq_metabol_all <- rbind(FADS1_priority_csq_metabol, FADS2_priority_csq_metabol, FADS3_priority_csq_metabol, FEN1_priority_csq_metabol, MYRF_priority_csq_metabol, TMEM258_priority_csq_metabol) %>% mutate(cohort = paste0(cohort, "-cohort"), IMPACT = factor(IMPACT, levels = c("HIGH", "MODERATE", "LOW",  "MODIFIER")))
 
 pri_csq_all <- rbind(pri_csq_mdd_all, pri_csq_metabol_all)
 
@@ -633,31 +633,106 @@ aaf_file <- priority_var_all %>%
 write.table(aaf_file, "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/REGENIE input/aaf_FADS.tsv", sep = "\t", col.names = F, row.names = F, quote = F)
 ```
 
-In Mask 4 0.01, I ran a LOVO scheme which should perform the burden test removing each variant at a time. This mask has 83 variants (FADS1), however the results is only for 42 variants (?). Not sure why there is a drop off. 
+## Supplementary Tables for Thesis
 
 ```{r}
-# Reading in the REGENIE mask 4 LOVO output 
+# load the excel file for adding sheets of other tables 
+supp_wb <- loadWorkbook('/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/WGS_supp_data.xlsx')
 
-lovo <- read.table("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/regenie_step2/mdd/mdd_FADS1_step2_LOVO_MajDepr.regenie", header = T)
+sheet_names <- getSheetNames('/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/WGS_supp_data.xlsx')
 
-mask4_0.01 <- priority_var_all %>% filter(mask4_0.01 == 1 & SYMBOL == "FADS1") 
-mask4_0.01 <- mask4_0.01 %>% mutate(
-  variant = gsub("chr11", "11", chr_pos_ref_alt)
-) %>% 
-  mutate(
-    variant = gsub("_", ":", variant)
-  )
-lovo$variant <- gsub("FADS1.Mask4.0.01_", "", lovo$ID)
-mask4_0.01 <- mask4_0.01 %>% mutate(
-  inlovo = ifelse(variant %in% lovo$variant, "YES", "NO")
-)
+# if statements to account for overwriting (if I want to add more columns etc I don't want it to be a new sheet, just to overwrite the old one)
 
-ggplot(mask4_0.01, aes(x = as.factor(most_deleterious), fill = as.factor(most_deleterious))) + geom_bar(stat="count") + facet_wrap(~inlovo)
+###########################################################
 
-ggplot(mask4_0.01, aes(x = as.factor(AC), fill = as.factor(most_deleterious))) + geom_bar(stat="count") + facet_wrap(~inlovo)
+# FADS1 priority variants 
+if (!("FADS1_priority_MDD_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS1_priority_MDD_cohort")
+}
+writeData(supp_wb,"FADS1_priority_MDD_cohort", FADS1_priority_mdd %>% 
+            select(-ends_with("_cov"), FILTER.y))
 
-ggplot(mask4_0.01, aes(x = POS, y = 5, color = as.factor(inlovo))) + geom_point()
+# Metabolite cohort 
+if (!("FADS1_priority_Meta_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS1_priority_Meta_cohort")
+}
+writeData(supp_wb,"FADS1_priority_Meta_cohort", FADS1_priority_metabol %>% 
+            select(-ends_with("_cov"), FILTER.y))
 
-ggplot(lovo, aes(x = variant, y = BETA)) + geom_point() + coord_flip()
+# FADS2 priority variants 
+if (!("FADS2_priority_MDD_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS2_priority_MDD_cohort")
+}
+writeData(supp_wb,"FADS2_priority_MDD_cohort", FADS2_priority_mdd %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# Metabolite cohort 
+if (!("FADS2_priority_Meta_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS2_priority_Meta_cohort")
+}
+writeData(supp_wb,"FADS2_priority_Meta_cohort", FADS2_priority_metabol %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# FADS3 priority variants 
+
+if (!("FADS3_priority_MDD_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS3_priority_MDD_cohort")
+}
+writeData(supp_wb,"FADS3_priority_MDD_cohort", FADS3_priority_mdd %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# Metabolite cohort 
+if (!("FADS3_priority_Meta_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS3_priority_Meta_cohort")
+}
+writeData(supp_wb,"FADS3_priority_Meta_cohort", FADS3_priority_metabol %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# FEN1 priority variants 
+if (!("FEN1_priority_MDD_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FEN1_priority_MDD_cohort")
+}
+writeData(supp_wb,"FEN1_priority_MDD_cohort", FEN1_priority_mdd %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# Metabolite cohort 
+if (!("FEN1_priority_Meta_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FEN1_priority_Meta_cohort")
+}
+writeData(supp_wb,"FEN1_priority_Meta_cohort", FEN1_priority_metabol %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# MYRF priority variants 
+if (!("MYRF_priority_MDD_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "MYRF_priority_MDD_cohort")
+}
+writeData(supp_wb,"MYRF_priority_MDD_cohort", MYRF_priority_mdd %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# Metabolite cohort 
+if (!("MYRF_priority_Meta_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "MYRF_priority_Meta_cohort")
+}
+writeData(supp_wb,"MYRF_priority_Meta_cohort", MYRF_priority_metabol %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# TMEM258 priority variants 
+if (!("TMEM258_priority_MDD_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "TMEM258_priority_MDD_cohort")
+}
+writeData(supp_wb,"TMEM258_priority_MDD_cohort", TMEM258_priority_mdd %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+# Metabolite cohort 
+if (!("TMEM258_priority_Meta_cohort" %in% sheet_names)) {
+  addWorksheet(supp_wb, "TMEM258_priority_Meta_cohort")
+}
+writeData(supp_wb,"TMEM258_priority_Meta_cohort", TMEM258_priority_metabol %>% 
+            select(-ends_with("_cov"), FILTER.y))
+
+
+# save the sheets 
+saveWorkbook(supp_wb, '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/WGS_supp_data.xlsx', overwrite=T)
 ```
+
 
