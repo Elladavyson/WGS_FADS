@@ -646,93 +646,63 @@ sheet_names <- getSheetNames('/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_pr
 ###########################################################
 
 # FADS1 priority variants 
-if (!("FADS1_priority_MDD_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FADS1_priority_MDD_cohort")
+if (!("FADS1_priority" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS1_priority")
 }
-writeData(supp_wb,"FADS1_priority_MDD_cohort", FADS1_priority_mdd %>% 
-            select(-ends_with("_cov"), FILTER.y))
+writeData(supp_wb,"FADS1_priority", FADS1_priority_mdd %>% 
+            mutate(in_metabolite_cohort = ifelse(chr_pos_ref_alt %in% FADS1_priority_metabol$chr_pos_ref_alt, "Yes", "No")) %>% 
+            select(-c(ends_with("_cov"), FILTER.y, CHR, POS, REF, ALT)))
 
-# Metabolite cohort 
-if (!("FADS1_priority_Meta_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FADS1_priority_Meta_cohort")
-}
-writeData(supp_wb,"FADS1_priority_Meta_cohort", FADS1_priority_metabol %>% 
-            select(-ends_with("_cov"), FILTER.y))
 
 # FADS2 priority variants 
-if (!("FADS2_priority_MDD_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FADS2_priority_MDD_cohort")
+if (!("FADS2_priority" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS2_priority")
 }
-writeData(supp_wb,"FADS2_priority_MDD_cohort", FADS2_priority_mdd %>% 
-            select(-ends_with("_cov"), FILTER.y))
+writeData(supp_wb,"FADS2_priority", FADS2_priority_mdd %>% 
+            mutate(in_metabolite_cohort = ifelse(chr_pos_ref_alt %in% FADS2_priority_metabol$chr_pos_ref_alt, "Yes", "No")) %>% 
+                   select(-c(ends_with("_cov"), FILTER.y, CHR, POS, REF, ALT)))
 
-# Metabolite cohort 
-if (!("FADS2_priority_Meta_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FADS2_priority_Meta_cohort")
-}
-writeData(supp_wb,"FADS2_priority_Meta_cohort", FADS2_priority_metabol %>% 
-            select(-ends_with("_cov"), FILTER.y))
 
 # FADS3 priority variants 
 
-if (!("FADS3_priority_MDD_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FADS3_priority_MDD_cohort")
+if (!("FADS3_priority" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FADS3_priority")
 }
-writeData(supp_wb,"FADS3_priority_MDD_cohort", FADS3_priority_mdd %>% 
-            select(-ends_with("_cov"), FILTER.y))
+writeData(supp_wb,"FADS3_priority", FADS3_priority_mdd %>% 
+             mutate(in_metabolite_cohort = ifelse(chr_pos_ref_alt %in% FADS3_priority_metabol$chr_pos_ref_alt, "Yes", "No")) %>% 
+                   select(-c(ends_with("_cov"), FILTER.y, CHR, POS, REF, ALT)))
 
-# Metabolite cohort 
-if (!("FADS3_priority_Meta_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FADS3_priority_Meta_cohort")
-}
-writeData(supp_wb,"FADS3_priority_Meta_cohort", FADS3_priority_metabol %>% 
-            select(-ends_with("_cov"), FILTER.y))
 
 # FEN1 priority variants 
-if (!("FEN1_priority_MDD_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FEN1_priority_MDD_cohort")
+if (!("FEN1_priorityt" %in% sheet_names)) {
+  addWorksheet(supp_wb, "FEN1_priority")
 }
-writeData(supp_wb,"FEN1_priority_MDD_cohort", FEN1_priority_mdd %>% 
-            select(-ends_with("_cov"), FILTER.y))
+writeData(supp_wb,"FEN1_priority", FEN1_priority_mdd %>% 
+             mutate(in_metabolite_cohort = ifelse(chr_pos_ref_alt %in% FEN1_priority_metabol$chr_pos_ref_alt, "Yes", "No")) %>% 
+                   select(-c(ends_with("_cov"), FILTER.y, CHR, POS, REF, ALT)))
 
-# Metabolite cohort 
-if (!("FEN1_priority_Meta_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "FEN1_priority_Meta_cohort")
-}
-writeData(supp_wb,"FEN1_priority_Meta_cohort", FEN1_priority_metabol %>% 
-            select(-ends_with("_cov"), FILTER.y))
 
 # MYRF priority variants 
-if (!("MYRF_priority_MDD_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "MYRF_priority_MDD_cohort")
+if (!("MYRF_priority" %in% sheet_names)) {
+  addWorksheet(supp_wb, "MYRF_priority")
 }
-writeData(supp_wb,"MYRF_priority_MDD_cohort", MYRF_priority_mdd %>% 
-            select(-ends_with("_cov"), FILTER.y))
+writeData(supp_wb,"MYRF_priority", MYRF_priority_mdd %>% 
+             mutate(in_metabolite_cohort = ifelse(chr_pos_ref_alt %in% MYRF_priority_metabol$chr_pos_ref_alt, "Yes", "No")) %>% 
+                  select(-c(ends_with("_cov"), FILTER.y, CHR, POS, REF, ALT)))
 
-# Metabolite cohort 
-if (!("MYRF_priority_Meta_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "MYRF_priority_Meta_cohort")
-}
-writeData(supp_wb,"MYRF_priority_Meta_cohort", MYRF_priority_metabol %>% 
-            select(-ends_with("_cov"), FILTER.y))
 
 # TMEM258 priority variants 
-if (!("TMEM258_priority_MDD_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "TMEM258_priority_MDD_cohort")
+if (!("TMEM258_priority" %in% sheet_names)) {
+  addWorksheet(supp_wb, "TMEM258_priority")
 }
-writeData(supp_wb,"TMEM258_priority_MDD_cohort", TMEM258_priority_mdd %>% 
-            select(-ends_with("_cov"), FILTER.y))
-
-# Metabolite cohort 
-if (!("TMEM258_priority_Meta_cohort" %in% sheet_names)) {
-  addWorksheet(supp_wb, "TMEM258_priority_Meta_cohort")
-}
-writeData(supp_wb,"TMEM258_priority_Meta_cohort", TMEM258_priority_metabol %>% 
-            select(-ends_with("_cov"), FILTER.y))
+writeData(supp_wb,"TMEM258_priority", TMEM258_priority_mdd %>% 
+             mutate(in_metabolite_cohort = ifelse(chr_pos_ref_alt %in% TMEM258_priority_metabol$chr_pos_ref_alt, "Yes", "No")) %>% 
+                  select(-c(ends_with("_cov"), FILTER.y, CHR, POS, REF, ALT)))
 
 
 # save the sheets 
 saveWorkbook(supp_wb, '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/WGS_supp_data.xlsx', overwrite=T)
+
 ```
 
 
