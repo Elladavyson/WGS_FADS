@@ -483,7 +483,6 @@ dx run swiss-army-knife \
 
 ##### REGENIE STEP 2 MDD
 
-
 dx run swiss-army-knife \
   -icmd="bash regenie_mdd_step2.sh TMEM258" \
   -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bed" \
@@ -523,6 +522,58 @@ dx run swiss-army-knife \
   --instance-type "mem1_ssd1_v2_x16" \
   --destination="/Output/regenie/step2_res/version3.2.6/MDD/lovo/" \
   --brief --yes
+
+## Metabolite LOVO Mask 5
+
+dx run swiss-army-knife \
+  -icmd="bash regenie_LOVO_metabolite.sh FADS1" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/FADS1_varqc_sampqc_HWE_combined.fam" \
+  -iin="/Output/regenie/ukb_unrel_eur_metabol.pheno" \
+  -iin="/Output/regenie/ukb_unrel_eur_covars.covar" \
+  -iin="/Output/regenie/input/annotations_FADS.tsv" \
+  -iin="/Output/regenie/input/masks_FADS.txt" \
+  -iin="/Output/regenie/input/aaf_FADS.tsv" \
+  -iin="/Output/regenie/input/setlist_FADS.tsv" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_1.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_2.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_3.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_4.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_5.loco.gz" \
+  -iin="/Output/regenie/input/metabolite_regenie_step1_pred.list" \
+  -iin="/Code/regenie_LOVO_metabolite.sh" \
+  --tag="regenie step 2 LOVO metabolite FADS1" \
+  --instance-type "mem1_ssd1_v2_x16" \
+  --destination="/Output/regenie/step2_res/version3.2.6/metabolite/lovo/" \
+  --brief --yes
+
+## LD calculation with PLINK (regenie output is confusing so sanity check)
+## With FADS1 first 
+
+pri_filter="plink --bfile TMEM258_varqc_sampqc_HWE_combined --extract TMEM258_priority_bedmatch.txt --make-bed --out TMEM258_priority_variants"
+ dx run swiss-army-knife \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_varqc_sampqc_HWE_combined.fam" \
+  -iin="/Output/regenie/input/TMEM258_priority_bedmatch.txt" \
+ -icmd="${pri_filter}" \
+ --tag="pri_filter_TMEM258_bed" \
+ --instance-type "mem1_hdd1_v2_x8" \
+ --destination="/Output/regenie/input/WGS_BEDS/" \
+ --brief --yes
+
+plink_LD="plink --bfile TMEM258_priority_variants --r2 --ld-snp-list TMEM258_priority_bedmatch.txt --ld-window-r2 0 --out TMEM258_priority_LD"
+ dx run swiss-army-knife \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_priority_variants.bed" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_priority_variants.bim" \
+  -iin="/Output/regenie/input/WGS_BEDS/TMEM258_priority_variants.fam" \
+  -iin="/Output/regenie/input/TMEM258_priority_bedmatch.txt" \
+ -icmd="${plink_LD}" \
+ --tag="LD_TMEM258_pri" \
+ --instance-type "mem1_hdd1_v2_x8" \
+ --destination="/Output/priority_LD/" \
+ --brief --yes
 
  ## LD heatmaps
 
