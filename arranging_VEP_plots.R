@@ -201,5 +201,52 @@ grid.arrange(add_label(FADS1_variantsummary_grob, "A) FADS1"),
 )
 dev.off()
 
+#### LD heatmaps
+genes_LD <- c("FADS1", "MYRF", "FEN1")
+
+for (gene in genes_LD) {
+  print(gene)
+  LD_plotdir <- file.path("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/LD_heatmaps/")
+  # FADS1 
+  imgA=png::readPNG(paste0(LD_plotdir, gene, "_priority_heatmap.png"))
+  imgB=png::readPNG(paste0(LD_plotdir, gene, "_priority_heatmap_over0.01.png"))
+  # Convert images to grobs
+  grobA <- rasterGrob(imgA, interpolate = TRUE)
+  grobB <- rasterGrob(imgB, interpolate = TRUE)
+  
+  add_label <- function(grob, label) {
+    label_grob <- textGrob(
+      label, x = unit(0, "npc") + unit(5, "mm"), y = unit(1, "npc") - unit(5, "mm"),
+      hjust = 0, vjust = 1, gp = gpar(fontsize = 12, fontface = "bold")
+    )
+    # Overlay label on the plot
+    gTree(children = gList(grob, label_grob))
+  }
+  
+  # Add labels to each plot
+  labeledA <- add_label(grobA, "A)")
+  labeledB <- add_label(grobB, "B)")
+  
+  # Create a title
+  title <- textGrob(
+    paste0(gene, ": Correlation between prioritised variants"), 
+    gp = gpar(fontsize = 17, fontface = "bold"), 
+    x = 0.5, hjust = 0.5
+  )
+  
+  # Arrange title and plots
+  pdf(paste0(LD_plotdir, gene, "_LD_heatmaps_arranged.pdf"), width = 8.27, height = 11.69) # A4 dimensions
+  grid.arrange(
+    title, labeledA, labeledB,
+    ncol = 1, heights = c(0.04, 0.48, 0.48) # Adjust heights for title and plots
+  )
+  dev.off()
+}
+
+
+
+
+
+
 
 
