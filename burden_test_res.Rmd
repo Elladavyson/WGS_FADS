@@ -187,9 +187,13 @@ ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/bu
 ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/burden_all_effects.png', plot = all_beta_effects , width = 7, height = 7, device='png', dpi=300)
 
 # METABOLITE results masks 
+
 metabolite_results_masks <- final_results_tests %>% filter(trait != "MDD" & grepl("Mask", ID))
 # Get the P value range for certain masks for each gene 
 # Mostly Mask 4 and 5 for FADS2 it is Mask 3
+
+# Find the mask-metabolites where there is at least one significant test
+
 metabolite_results_masks %>%
   filter(ID == "Mask3.0.01" | ID == "Mask3.singleton") %>%
   group_by(GENE, trait) %>%
@@ -201,6 +205,20 @@ metabolite_results_masks %>%
     p_max_below_0.05 = format(ifelse(any(p < 0.05), max(p[p < 0.05]), NA), scientific = TRUE) # Max p-value below 0.05
   ) %>%
   filter(GENE == "FADS2")
+
+# Joint burden test results for all traits for TEM258, MYRF and FEN1
+final_results_tests %>% filter(!grepl("Mask", ID) & trait != "MDD") %>% 
+  group_by(GENE, TEST) %>% 
+  summarize(
+        p_min = format(min(p), scientific = TRUE),  # Minimum p-value in scientific notation
+    p_max = max(p),  # Maximum p-value
+    p_max_scientific = format(max(p), scientific = TRUE),
+    p_min_test = TEST[which.min(p)],            # Test corresponding to the min p-value
+    p_max_test = TEST[which.max(p)]
+  ) %>% 
+  filter(GENE == "FADS1")
+# FADS3 joint resuls 
+final_results_tests %>% filter(!grepl("Mask", ID) & GENE == "FADS1" & trait == "DHA")
 
 ### For FADS1 Mask5.0.01 Find the most powerful test
 metabolite_results_masks %>%
@@ -232,6 +250,17 @@ FADS1_Mask5_ACATV <- mdd_results %>%
          all_test = TEST)
 FADS1_Mask5_res <- rbind(FADS1_Mask5_ACATV, FADS1_Mask5_SKAT)
 ```
+# T-test results
+
+```{r}
+meta_ttests <- read.table("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/statistical_tests/ttest_metabolite_carrier_permask_all_results.tsv", sep = "\t", header = T)
+# TMEM258 Mask4 and Mask5
+# MYRF Mask4 and Mask5
+meta_ttests %>% filter(gene == "MYRF" & (mask == "Mask4.0.01_status" | mask == "Mask5.0.01_status")) %>% as.data.frame()
+
+# MYRF Mask4 and Mask 5
+
+```
 
 # LOVO results 
 
@@ -248,7 +277,10 @@ lovo_res_mdd$variant <- gsub("FADS1.Mask5.0.01_", "", lovo_res_mdd$ID)
 lovo_res_mdd <- lovo_res_mdd %>% separate(variant, into = c("CHR", "POS", "REF", "ALT"), remove = FALSE) %>% 
   mutate(lowCI = BETA - 1.96*(SE),
          highCI = BETA + 1.96*(SE)) %>% 
-  mutate(POS = as.numeric(GENPOS)) %>% mutate(trait = "MDD")
+  mutate(POS = as.numeric(GENPOS)) %>% mutate(trait = "MDD", p = 10^-(LOG10P))
+
+lovo_res_mdd %>% filter(TEST == "ADD-ACATV") %>% arrange(LOG10P)
+lovo_res_mdd %>% filter(variant != "11:61816814:G:C") %>% pull(p) %>% range()
 
 # Reading in metabolite LOVO results 
 lovo_res_metabolites <- list()
@@ -271,7 +303,12 @@ for (i in seq_along(metabolites)) {
     }
   }
 lovo_res_metabolite <- do.call(rbind, lovo_res_metabolites)
+lovo_res_metabolite <- lovo_res_metabolite %>% mutate(p = 10^-(LOG10P))
 lovo_res_metabolite_skato <- lovo_res_metabolite %>% filter(TEST == "ADD-SKAT")
+lovo_res_metabolite_skato %>% filter(variant != "11:61810815:C:A") %>% filter(trait == "DHA") %>% pull(p) %>% range()
+
+
+lovo_res_metabolite_skato %>% arrange(LOG10P)
 lovo_res_all <- rbind(lovo_res_mdd %>% filter(TEST == "ADD-ACATV"), lovo_res_metabolite_skato)
 # select(c(CHROM, GENPOS, ID, ALLELE0, ALLELE1, A1FREQ, N, TEST, BETA, SE, CHISQ, LOG10P, EXTRA, variant, CHR, POS, REF, ALT, lowCI, highCI)
 # Read in the variant annotation results so I have can add this info to the plot: 
@@ -320,6 +357,17 @@ ggsave(filename = '/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/LO
 
 lovo_res_all %>% filter(trait == "MDD") %>% arrange(LOG10P, decreasing = TRUE) %>% as.data.frame()
 FADS1_priority %>% filter(variant == "11:61816814:G:C")
+```
+
+# LOVO t-test results 
+
+Testing the association between carriers and non carriers of the LOVO variants with metabolomic measures using Welch's T-test 
+
+```{r}
+chr11_61816814_G_C_ttest <- read.table("/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Intermediate_data_files/statistical_tests/mdd_lovo_variant_ttest_res.tsv", sep = "\t", header = T)
+
+range(chr11_61816814_G_C_ttest$p_value)
+
 ```
 
 # Thesis supplementary tables
