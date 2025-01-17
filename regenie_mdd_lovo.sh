@@ -39,6 +39,3 @@ regenie_v3.2.6.gz_x86_64_Linux_mkl --step 2 \
   --mask-lovo ${GENE},Mask5,0.01 \
   --bsize 100 \
   --out mdd_${GENE}_step2_LOVO_mask5_0.01
-
-
-
