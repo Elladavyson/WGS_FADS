@@ -1,3 +1,6 @@
+############################# 
+# Worth setting up a snapshot of these libraries and data files ? 
+#############################
 library(data.table)
 library(dplyr)
 library(bestNormalize) # Have to install
@@ -9,8 +12,9 @@ library(ggplot2)
 library(Hmisc) # Have to install
 library(ggpubr) # Have to install 
 library(ggsignif) # Have to install 
-library(#R) # Have to install 
+library(UpSetR) # Have to install 
 library(caret) # Have to install
+library(effectsize) # Have to install
 
 # dx download /Output/genotypes/genotype_summary/all_priority/*_carrier_info.tsv
 # dx download /Output/genotypes/genotype_summary/all_priority/*_participant_var_summary.tsv
@@ -878,9 +882,9 @@ run_t_test <- function(metabolite, gene, mask, data) {
       message(paste0("Skipping:", gene, mask, " - Mask not available"))
       return(NULL)
     }
-
     print("Running t-test")
-    ttest_result <- t.test(data[[metabolite]]~ data[[mask]], data = data)
+    ttest_result <- t.test(data[[metabolite]]~ data[[mask]], data = data, var.equal = FALSE)
+    cohens <- cohens_d(data[[metabolite]]~ data[[mask]], data = data, var.equal = FALSE)
     print("Results table")
     result <- data.frame(
         metabolite= get_metabolitename(metabolite),
@@ -891,7 +895,10 @@ run_t_test <- function(metabolite, gene, mask, data) {
         conf_int_lower=ttest_result$conf.int[1],
         conf_int_upper=ttest_result$conf.int[2],
         mean_diff=ttest_result$estimate[1] - ttest_result$estimate[2],
-        p_value=ttest_result$p.value
+        p_value=ttest_result$p.value,
+        cohens_effect=cohens$Cohens_d,
+        cohens_lowCI=cohens$CI_low,
+        cohens_highCI=cohens$CI_high
     )
     return(result)
 }
@@ -1179,46 +1186,86 @@ return(carrier_summary)
 }
 fads1_mdd_lovo_summary <- summary_carriers_lovo(fads1_mdd_lovo_all %>% filter(status != "NA"))
 write.table(fads1_mdd_lovo_summary, "FADS1_chr11_61816814_G_C_demo.tsv", sep = "\t", quote = F,row.names = F)
+
 ####################################################################
 
-# Graphs of norm metabolite carriers witrh LOVO variant highlighted 
+# LOVO variant deeper dive
 
 ####################################################################
 
 norm_metabolite_carriers <- norm_metabolite_carriers %>% mutate(lovo_mdd_carrier= ifelse(f.eid %in% fads1_mdd_lovo_carriers$SAMPLE, "Carrier", "Non-carrier"))
 
-violin_meta_dists_mdd_lovo <- function(gene, metabolite, mask) {
+#### Chi squared test/Fishers Exact test between the carriers and MDD
+fads_mdd_lovo_sample <- fads1_mdd_lovo_all %>% filter(status != "NA") %>% filter(GENE == "FADS1")
+table_data <- table(fads_mdd_lovo_sample[,"MajDepr"], fads_mdd_lovo_sample[,"lovo_carrier"])
+      rownames(table_data) <- c("Controls", "Cases")
+      chi_test <- chisq.test(table_data)
+
+      # Expected frequencies for Chi test < 5 so using Fishers' Exact Test instead
+fishers <- fisher.test(table_data)
+fisher_res <- data.frame(odds_ratio=fishers$estimate,
+CI_low = fishers$conf.int[[1]],
+CI_high = fishers$conf.int[[2]],
+p = fishers$p.value,
+method = fishers$method
+)
+      
+## T-test for Carrier status and metabolite levels
+ttest_results <- do.call(
+  rbind,
+  lapply(metabolites, function(metabolite) {
+run_t_test(metabolite, "FADS1", "lovo_mdd_carrier", norm_metabolite_carriers)
+        })
+        )
+
+write.table(ttest_results, "mdd_lovo_variant_ttest_res.tsv", sep = "\t", row.names = T, quote = F)
+write.table(fisher_res, "mdd_lovo_variant_fisher_res.tsv", sep = "\t", row.names = F, quote =F)
+
+violin_meta_dists_lovo <- function(gene, metabolite, lovo_var, lovo_variant_label, ttest_df, outliers = FALSE, outlier_df) {
     # Filter out NA values for the gene status column
     norm_metabolite <- norm_metabolite_carriers %>% 
-        filter(GENE == gene) %>%
+        filter(GENE == "FADS1") %>%
         mutate(across(
     all_of(mask_columns), 
     ~ factor(., levels = c("carrier", "non-carrier"))
   ))
+  # If not plotting outliers then set this variable to be No
+  norm_metabolite <- norm_metabolite %>% mutate(outliers = "No")
+  # If plotting outliers set a variable to denote whether a sample is an outlier or not 
+  if(outliers==TRUE) {
+    outlier_sample = unique(outlier_df$outlier_samples)
+    norm_metabolite <- norm_metabolite %>%
+    mutate(outlier = ifelse(f.eid %in% outlier_sample, "Yes", "No"))
+  }
     # Get the relevant ttest result
     metabolitename <- get_metabolitename(metabolite)
     genename <- gene
-    maskname <- mask
-    plt <- ggplot(norm_metabolite, aes(x = as.factor(MajDepr), 
-                                       y = !!sym(metabolite), 
-                                       fill = as.factor(MajDepr))) + 
+    ttest_res <- ttest_df %>% filter(metabolite == metabolitename)
+    ttest_p <- ttest_res$p_value
+    ttest_plabel <- paste0("p = ", formatC(ttest_p, format = "e", digits = 2) %>% as.character())
+    plt <- ggplot(norm_metabolite, aes(x = as.factor(!!sym(lovo_var)), 
+                                       y = !!sym(metabolite),
+                                       color = as.factor(!!sym(lovo_var)), 
+                                       fill = as.factor(!!sym(lovo_var)))) + 
         geom_violin(trim = FALSE, na.rm = TRUE, alpha = 0.3) +
-        geom_jitter(aes(color = lovo_mdd_carrier), shape = 16, position = position_jitter(0.2), na.rm = TRUE) +
-        scale_color_brewer(palette = "Set2", aesthetics = c("fill"), 
-                           labels = c("Controls", "Cases"), 
-                           name = "MDD status") +
-        scale_color_manual(values = c("Carrier" = "#FF007F", "Non-carrier"="gray"),
-        name = "c.116C>G")+ 
+        scale_color_brewer(palette = "Set1", aesthetics = c("colour", "fill"), 
+                           labels = c("Carrier", "Non-carrier"), 
+                           name = lovo_variant_label) + 
         theme_classic() +
-        facet_wrap(~Mask5.0.01_status) +
+        geom_jitter(position = position_jitter(0.2), shape = as.factor(norm_metabolite$outlier), na.rm = TRUE) +
         stat_summary(fun.data = data_summary, shape = 23, color = "black", na.rm = TRUE) + 
         labs(title ="", 
-             x = "MDD status", 
-             y =   'Normalised measure') + 
-        scale_x_discrete(labels = c("Controls", "Cases")) +
+             x = lovo_variant_label, 
+             y =  'Normalised measure') + 
+        scale_x_discrete(labels = c("Carrier", "Non-carrier")) +
         theme(
-              text = element_text(size = 9))
+              text = element_text(size = 9))+
 
+              geom_signif(comparisons = list(c("Carrier", "Non-carrier")),
+              map_signif_level = TRUE,
+              annotations=ttest_plabel,
+              tip_length = 0.03, color = "black",
+              vjust = 2)
     return(plt)
 }
 
@@ -1226,17 +1273,15 @@ violin_meta_dists_mdd_lovo <- function(gene, metabolite, mask) {
 mdd_mask5_plots_FADS1_lovo <- list()
 for(i in 1:length(metabolites)) {
   metabolite <- metabolites[i]
-  mdd_mask5_plots_FADS1_lovo[[i]] <- violin_meta_dists_mdd_lovo("FADS1", metabolite, "Mask5.0.01_status")
-  
+  mdd_mask5_plots_FADS1_lovo[[i]] <- violin_meta_dists_lovo("FADS1", metabolite, "lovo_mdd_carrier", "chr11:61816814:G:C", ttest_results)
 }
 FADS1_mask5_mddshort_lovo <- ggarrange(plotlist = mdd_mask5_plots_FADS1_lovo, 
                              nrow = 3, 
                              ncol = 2, 
-                             labels = sapply(metabolites, get_metaboliteshort),
-                             common.legend = TRUE)
+                             labels = sapply(metabolites, get_metaboliteshort))
 
-ggsave(filename =  "FADS1_meta_hists_carriers_mask50.01_mdd_lovo.png", 
-         plot = annotate_figure(FADS1_mask5_mddshort_lovo, top = text_grob("FADS1\nPrioritised variant carriers (Mask 5), MDD status and c.116C>G variant carriers", size = 14, face = "bold")),
+ggsave(filename =  "FADS1_meta_hists_carriers_chr11_61816814_G_C_lovo.png", 
+         plot = annotate_figure(FADS1_mask5_mddshort_lovo, top = text_grob("Violin plots of metabolite measures:\nCarriers and non-carriers of chr11:61816814:G:C variant", size = 12, face = "bold")),
          width = 8, height = 10, device = "png", dpi = 300)
 
 ################################################################
@@ -1310,53 +1355,83 @@ fads1_metabolite_lovo_summary <- summary_metacarrier_status_lovo(fads1_metabolit
 write.table(fads1_metabolite_lovo_summary, "FADS1_chr11_61810815_C_A_meta_demo.tsv", sep = "\t", quote = F,row.names = F)
 
 ####### Plotting the metabolite distributions 
-
 norm_metabolite_carriers <- norm_metabolite_carriers %>% mutate(lovo_metabolite_carrier= ifelse(f.eid %in% fads1_metabolite_lovo_carriers$SAMPLE, "Carrier", "Non-carrier"))
 
+ttest_results_metabolite <- do.call(
+  rbind,
+  lapply(metabolites, function(metabolite) {
+run_t_test(metabolite, "FADS1", "lovo_metabolite_carrier", norm_metabolite_carriers)
+        })
+        )
 
-violin_meta_dists_lovo <- function(gene, metabolite) {
-    # Filter out NA values for the gene status column
-    norm_metabolite <- norm_metabolite_carriers %>% 
-        filter(GENE == "FADS1") %>%
-        mutate(across(
-    all_of(mask_columns), 
-    ~ factor(., levels = c("carrier", "non-carrier"))
-  ))
-    # Get the relevant ttest result
-    metabolitename <- get_metabolitename(metabolite)
-    genename <- gene
-    plt <- ggplot(norm_metabolite, aes(x = as.factor(lovo_mdd_carrier), 
-                                       y = !!sym(metabolite),
-                                       color = as.factor(lovo_mdd_carrier), 
-                                       fill = as.factor(lovo_mdd_carrier))) + 
-        geom_violin(trim = FALSE, na.rm = TRUE, alpha = 0.3) +
-        scale_color_brewer(palette = "Set1", aesthetics = c("colour", "fill"), 
-                           labels = c("Carrier", "Non-carrier"), 
-                           name = "chr11:61810815:C:A") + 
-        theme_classic() +
-        geom_jitter(shape = 16, position = position_jitter(0.2), na.rm = TRUE) +
-        stat_summary(fun.data = data_summary, shape = 23, color = "black", na.rm = TRUE) + 
-        labs(title ="", 
-             x = "chr11:61810815:C:A", 
-             y =  'Normalised measure') + 
-        scale_x_discrete(labels = c("Carrier", "Non-carrier")) +
-        theme(legend.position = "none", 
-              text = element_text(size = 9))
-    return(plt)
+
+write.table(ttest_results_metabolite, "metabolite_lovo_variant_ttest_res.tsv", sep = "\t", row.names = F, quote = F)
+
+###### Assessing the potential outliers in the carriers of the metabolite LOVO variant (on seeing the box plot)
+stat_df <- function(metabolite) {
+  carrier_data <- norm_metabolite_carriers %>% filter(GENE == "FADS1" & lovo_metabolite_carrier=="Carrier")
+  print(metabolite)
+  carrier_meta <- carrier_data[, metabolite]
+  Q1 <- quantile(carrier_meta, 0.25)
+  Q3 <- quantile(carrier_meta, 0.75)
+  IQR_value <- IQR(carrier_meta)
+  lower_bound <- Q1 - 1.5 * IQR_value
+  upper_bound <- Q3 + 1.5 * IQR_value
+  outliers <- carrier_data[carrier_data[,metabolite] < lower_bound | carrier_data[, metabolite] > upper_bound,]
+  stats <- data.frame(metabolite = metabolite, Q1 = as.numeric(Q1), Q3 = as.numeric(Q3),
+  IQR = as.numeric(IQR_value), lower_bound= as.numeric(lower_bound) , upper_bound = as.numeric(upper_bound),
+  outliers = ifelse(nrow(outliers)>0, nrow(outliers), "None"),
+  outlier_samples = ifelse(nrow(outliers)>0, paste(outliers$f.eid, collapse = ":"), "None"))
+return(stats)
 }
 
+outlier_stats <- lapply(metabolites, stat_df)
+outlier_stats <- do.call(rbind, outlier_stats)
+
+write.table(outlier_stats, "metabolite_lovo_carriers_outlier_stats.tsv", sep = "\t", row.names = F, quote = F)
+
+######## Run the T-test after removing the outlier sample (IQR method)
+ttest_results_metabolite_nooutlier <- do.call(
+  rbind,
+  lapply(metabolites, function(metabolite) {
+run_t_test(metabolite, "FADS1", "lovo_metabolite_carrier", norm_metabolite_carriers %>% filter(f.eid != unique(outlier_stats$outlier_samples)))
+        })
+        )
+
+write.table(ttest_results_metabolite_nooutlier, "metabolite_lovo_variant_nooutlier_ttest_res.tsv", sep = "\t", row.names = F, quote = F)
+
+## Plot the distribution of all the variants 
 metabolite_mask5_plots_FADS1_lovo <- list()
 for(i in 1:length(metabolites)) {
   metabolite <- metabolites[i]
-  metabolite_mask5_plots_FADS1_lovo[[i]] <- violin_meta_dists_lovo("FADS1", metabolite)
+  metabolite_mask5_plots_FADS1_lovo[[i]] <- violin_meta_dists_lovo("FADS1", metabolite, "lovo_metabolite_carrier", "chr11:61810815:C:A", ttest_results_metabolite, 
+  outliers =TRUE, outlier_stats)
   
 }
 FADS1_mask5_metaboliteshort_lovo <- ggarrange(plotlist = metabolite_mask5_plots_FADS1_lovo, 
                              nrow = 3, 
                              ncol = 2, 
-                             labels = sapply(metabolites, get_metaboliteshort),
-                             common.legend = TRUE)
+                             labels = sapply(metabolites, get_metaboliteshort), common.legend = TRUE)
+
 
 ggsave(filename =  "FADS1_meta_hists_chr11_61810815_C_A_carriers.png", 
-plot = annotate_figure(FADS1_mask5_metaboliteshort_lovo, top = text_grob("FADS1\nMetabolite histograms for carriers and non-carriers of chr11:61810815:C:A variant", size = 14, face = "bold")),
+plot = annotate_figure(FADS1_mask5_metaboliteshort_lovo, top = text_grob("Violin plots of metabolite measures:\nCarriers and non-carriers of chr11:61810815:C:A variant", size = 14, face = "bold")),
+width = 8, height = 10, device = "png", dpi = 300)
+
+# Plot the distribution without the outlier
+# remove the outlier sample from the dataframe before plotting
+norm_metabolite_carriers <- norm_metabolite_carriers %>% filter(f.eid %in% unique(outlier_stats$outlier_sample)==FALSE)
+metabolite_plots_FADS1_lovo_nooutlier <- list()
+for(i in 1:length(metabolites)) {
+  metabolite <- metabolites[i]
+  metabolite_plots_FADS1_lovo_nooutlier[[i]] <- violin_meta_dists_lovo("FADS1", metabolite, "lovo_metabolite_carrier", "chr11:61810815:C:A", ttest_results_metabolite_nooutlier, 
+  outliers =FALSE)
+  
+}
+FADS1_metaboliteshort_lovo_nooutliers <- ggarrange(plotlist = metabolite_plots_FADS1_lovo_nooutlier, 
+                             nrow = 3, 
+                             ncol = 2, 
+                             labels = sapply(metabolites, get_metaboliteshort), common.legend = TRUE)
+ggsave(filename =  "FADS1_meta_hists_chr11_61810815_C_A_carriers_no_outliers.png", 
+plot = annotate_figure(FADS1_metaboliteshort_lovo_nooutliers, top = text_grob("Violin plots of metabolite measures:\nCarriers and non-carriers of chr11:61810815:C:A variant\n (After removing outlying sample based on IQR)", size = 14, face = "bold")),
 width = 8, height = 10, device = "png", dpi = 300)
