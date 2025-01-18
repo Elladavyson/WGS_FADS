@@ -1435,3 +1435,20 @@ FADS1_metaboliteshort_lovo_nooutliers <- ggarrange(plotlist = metabolite_plots_F
 ggsave(filename =  "FADS1_meta_hists_chr11_61810815_C_A_carriers_no_outliers.png", 
 plot = annotate_figure(FADS1_metaboliteshort_lovo_nooutliers, top = text_grob("Violin plots of metabolite measures:\nCarriers and non-carriers of chr11:61810815:C:A variant\n (After removing outlying sample based on IQR)", size = 14, face = "bold")),
 width = 8, height = 10, device = "png", dpi = 300)
+
+##Metabolite lovo variant with MDD
+
+fads_metabolite_lovo_sample <- fads1_metabolite_lovo_all  %>% filter(status != "NA") %>% filter(GENE == "FADS1")
+table_data <- table(fads_metabolite_lovo_sample[,"MajDepr"], fads_metabolite_lovo_sample[,"lovo_carrier"])
+      rownames(table_data) <- c("Controls", "Cases")
+      chi_test <- chisq.test(table_data)
+
+      # Expected frequencies for Chi test < 5 so using Fishers' Exact Test instead
+fishers <- fisher.test(table_data)
+fisher_res <- data.frame(odds_ratio=fishers$estimate,
+CI_low = fishers$conf.int[[1]],
+CI_high = fishers$conf.int[[2]],
+p = fishers$p.value,
+method = fishers$method
+)
+write.table(fisher_res, "metabolite_lovo_variant_mdd_fishers_res.tsv", sep = "\t", row.names =F, quote = F)      
