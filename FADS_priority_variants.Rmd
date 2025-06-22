@@ -114,7 +114,7 @@ ACcounts_graph <- ggplot(pri_ACcounts_all, aes(x=range, y = n)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1),
         strip.text.x = element_text(size = 12),
-        strip.text.y = element_text(size = 7),
+        strip.text.y = element_text(size = 12),
         plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) + 
   facet_grid(cohort ~ GENE)
 
@@ -122,7 +122,7 @@ ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FAD
 
 ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_ACcounts_allgenes.png", ACcounts_graph, width = 12, height = 6, device = "png", dpi= 300)
 
-ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_subplots.png", ggarrange(all_cohort_pri_csq, ACcounts_graph, ncol = 1, nrow = 2), width = 14, height = 14, device = "png", dpi= 300)
+ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants_subplots.png", ggarrange(all_cohort_pri_csq, ACcounts_graph, ncol = 1, nrow = 2), width = 8.3, height = 10, device = "png", dpi= 300)
 
 
 ```
@@ -354,11 +354,11 @@ guides(color= guide_legend(label = FALSE)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         strip.text.x = element_text(size = 12),
-        strip.text.y = element_text(size = 6.5),
+        strip.text.y = element_text(size = 12),
          plot.title = element_text(hjust = 0.5, face = "bold", size = 14), legend.position = "top")
 
 ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_variant_masks_af_counts.png", 
-masks_bothcohorts, width = 12, height = 6, device = "png", dpi= 300)
+masks_bothcohorts, width = 9, height = 6, device = "png", dpi= 300)
 masks_bothcohorts
 
 ggsave(filename= "/Users/ellad/UniversityEdinburgh/PhD/Year_3/WGS_proj/Plots/FADS_pri_variants__masks_subplots.png", ggarrange(ACcounts_graph, masks_bothcohorts, ncol = 1, nrow = 2, labels = c("A", "B")), width = 8.27, height = 11.69, device = "png", dpi= 300)
